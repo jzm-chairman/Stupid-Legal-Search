@@ -39,3 +39,19 @@ temp/filename.pkl
 [name1, name2, ...]
 ```
 
+## 简单服务器
+
+首先将preprocess的结果导入MongoDB，在MongoDB的`bin/`目录下运行：
+
+```bash
+mongoimport --db SearchEngine --collection InvertedIndex --file sources/temp/inverted_index.json --jsonArray
+```
+
+接着在`sources/SearchEngine`启动服务器：
+
+```bash
+python manage.py runserver
+```
+
+访问`127.0.0.1:8000/query?term=$your term$`可以获取对应的倒排索引列表。
+
