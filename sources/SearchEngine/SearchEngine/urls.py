@@ -20,5 +20,7 @@ import SearchEngine.views as views
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('test/', views.test),
-    path('query/', views.query)
+    path('query/', views.query),
+    path('search/', views.search),
+    path('detail/', views.detail)
 ]

@@ -1,1 +1,1 @@
-mongoimport --db SearchEngine --collection InvertedIndex --file E:\Tsinghua\2020_spring\SearchEngine\Project\Stupid-Legal-Search\sources\temp\inverted_index.json --jsonArray
+mongoimport --db SearchEngine --collection InvertedIndex --file ..\temp\inverted_index.json --type json

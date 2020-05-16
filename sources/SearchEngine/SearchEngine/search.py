@@ -3,12 +3,18 @@ import pickle
 import thulac
 import re
 from xml.dom.minidom import parse
+from cachetools import LRUCache
 
-doc_files_store = "temp/filename.pkl"
-inverted_index_store = "temp/inverted_index.json"
+root_dir = "../../../"
+doc_files_store = root_dir + "temp/filename.pkl"
+inverted_index_store = root_dir + "temp/inverted_index.json"
 cutter = thulac.thulac(seg_only=True)
 
 unpack_info = lambda ds, iis: (pickle.loads(open(ds, "rb").read()), json.loads(open(iis, "r+", encoding="utf-8").read()))
+
+MAX_CACHE_SIZE = 1000
+summary_cache = LRUCache(maxsize=MAX_CACHE_SIZE)
+document_cache = LRUCache(maxsize=MAX_CACHE_SIZE)
 
 def recall(words, inverted_index):
     doc_counter = {}
@@ -29,8 +35,39 @@ def rank(doc_counter):
     return [item[0] for item in sorted(list(doc_counter.items()), key=lambda x: (-x[1][0], -x[1][1]))]
 
 def get_content(doc_index, doc_files):
-    # 根据索引获取全文内容
-    return [parse(doc_files[doc]).documentElement.getElementsByTagName("QW")[0].getAttribute("value") for doc in doc_index]
+    # 根据索引获取文档内容
+    result = []
+    for doc in doc_index:
+        if doc not in summary_cache:
+            item = {}
+            item["internal_index"] = doc
+            root = parse(doc_files[doc]).documentElement
+            normal_keys = {"title": "WS", "content": "QW", "category": "AJLX", "time": "CPSJ"}
+            for result_key, xml_key in normal_keys.items():
+                elems = root.getElementsByTagName(xml_key)
+                if len(elems) == 0:
+                    continue
+                item[result_key] = elems[0].getAttribute("value")
+            summary_cache[doc] = item
+        result.append(summary_cache[doc])
+    return result
+
+def get_single_detail(doc, doc_files):
+    if doc in document_cache:
+        return document_cache[doc]
+    root = parse(doc_files[doc]).documentElement
+    keys = ["WS", "JBFY", "AH", "CPSJ", "DSR", "SSJL", "AJJBQK", "CPFXGC", "PJJG", "WW"]
+    item = {}
+    for xml_key in keys:
+        elems = root.getElementsByTagName(xml_key)
+        if len(elems) == 0:
+            continue
+        key_cn = elems[0].getAttribute("nameCN")
+        value = elems[0].getAttribute("value")
+        item[key_cn] = value
+    document_cache[doc] = item
+    return item
+
 
 def main_loop(doc_files, inverted_index):
     while True:
@@ -46,5 +83,6 @@ def main_loop(doc_files, inverted_index):
 
 if __name__ == "__main__":
     doc_files, inverted_index = unpack_info(doc_files_store, inverted_index_store)
+    doc_files = [root_dir + file for file in doc_files]
     main_loop(doc_files, inverted_index)
 

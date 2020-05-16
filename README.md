@@ -55,3 +55,26 @@ python manage.py runserver
 
 访问`127.0.0.1:8000/query?term=$your term$`可以获取对应的倒排索引列表。
 
+## 有前端了
+
+先确定文件列表和倒排索引的位置在`temp/`
+
+在`source/SearchEngine`下运行`manage.py`启动服务器
+
+在`source/SearchEngine-FrontEnd`下运行
+
+```
+npm install
+npm run dev
+```
+
+在前端代码中指定了后端端口为8000
+
+如果发送请求的时候chrome浏览器报CORS错误(控制台可见)，就右键打开桌面chrome的快捷方式“属性”，在“目标”最后添加
+
+```
+--disable-web-security --user-data-dir=<某个目录>
+```
+
+关闭浏览器安全控制。用这种方式打开chrome，个人设置和历史记录会全部清空（不用这种方式打开即可恢复）。
+
