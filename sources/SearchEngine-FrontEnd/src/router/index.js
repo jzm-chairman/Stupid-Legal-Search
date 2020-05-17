@@ -9,17 +9,27 @@ export default new Router({
     {
       path: '/',
       name: 'Home',
-      component: () => import('../components/Home.vue')
+      component: () => import('../components/Home.vue'),
+      meta: { title: '几把搜索' }
     },
     {
-      path: '/result',
-      name: 'SearchResult',
-      component: () => import('../components/SearchResult.vue')
-    },
-    {
-      path: '/detail',
-      name: 'Detail',
-      component: () => import('../components/Detail.vue')
+      path: '/',
+      name: 'Common',
+      component: () => import('../common/Common.vue'),
+      children: [
+        {
+          path: '/result',
+          name: 'SearchResult',
+          component: () => import('../components/SearchResult.vue'),
+          meta: { title: '搜索结果' }
+        },
+        {
+          path: '/detail',
+          name: 'Detail',
+          component: () => import('../components/Detail.vue'),
+          meta: { title: '文书细节' }
+        }
+      ]
     }
   ]
 })
