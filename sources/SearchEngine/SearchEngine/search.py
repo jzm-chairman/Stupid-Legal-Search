@@ -24,7 +24,7 @@ def filters(doc_counter, condition, doc_files):
         detail = get_single_detail(doc, doc_files)
         flag = True
         for key in condition:
-            if detail[key] != condition[key]:
+            if key not in detail or detail[key] != condition[key]:
                 flag = False
                 break
         if flag:
@@ -71,6 +71,8 @@ def get_summary(doc_index, doc_files):
         results.append(summary_cache[doc])
         item = summary_cache[doc]
         for key in need_stats_keys:
+            if key not in item:
+                continue
             statistics[key][item[key]] = 1 if item[key] not in statistics[key] else statistics[key][item[key]] + 1
     rets["results"] = results
     rets["statistics"] = statistics
