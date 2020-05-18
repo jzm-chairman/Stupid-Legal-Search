@@ -134,7 +134,6 @@ dmypy.json
 .DS_Store 
 node_modules
 dist
-static
 # local env files
 .env.local
 .env.*.local
