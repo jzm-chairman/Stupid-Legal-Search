@@ -53,7 +53,7 @@ def rank(doc_recall, words, inverted_index):
             continue
         for doc in doc_recall:
             scores[local_doc_index[doc]] += inverted_index[word][str(doc)]["score"]
-    doc_rank = [doc_recall[i] for i in scores.argsort()]
+    doc_rank = [doc_recall[i] for i in scores.argsort()[::-1]]
     return doc_rank
 
 def get_summary(doc_index, doc_files):
