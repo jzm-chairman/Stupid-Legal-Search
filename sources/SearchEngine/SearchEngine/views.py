@@ -1,7 +1,7 @@
 from django.http import HttpResponse
 from SearchEngine.models import *
 import pickle, json
-from .search import unpack_info, recall, rank, get_summary, get_single_detail, filters, need_stats_keys
+from .search import *
 
 doc_files_store = "../../temp/filename.pkl"
 inverted_index_store = "../../temp/inverted_index.json"
@@ -35,11 +35,13 @@ def query(request):
 def search(request):
     query = request.GET.get('searchkey')
     condition = {key: request.GET.get(key) for key in need_stats_keys if request.GET.get(key) is not None}
-    doc_counter = recall(query, inverted_index)
+    query_words = list(filter(lambda x: re.match(r"[0-9\u4e00-\u9af5]+", x) is not None, [item[0] for item in cutter.cut(query)]))
+    query_words = list(set(query_words))
+    doc_recall = recall(query_words, inverted_index)
     print(condition)
-    doc_counter = filters(doc_counter, condition, doc_files)
-    doc_index = rank(doc_counter)
-    doc_content = get_summary(doc_index, doc_files)
+    doc_recall = filters(doc_recall, condition, doc_files)
+    doc_rank = rank(doc_recall, query_words, inverted_index)
+    doc_content = get_summary(doc_rank, doc_files)
     return response(json.dumps(doc_content, ensure_ascii=False))
 
 def detail(request):

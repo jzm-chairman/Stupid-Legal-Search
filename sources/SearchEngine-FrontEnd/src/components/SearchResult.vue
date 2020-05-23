@@ -123,13 +123,15 @@ export default {
         color: #666;
     }
 .sidebar {
-    left: 0;
     float: left;
+    padding: 0 0 0 10px;
 }
 .sidebar-menu {
 
 }
 .right {
-    float: right;
+  float: right;
+  padding: 0 100px 0 0;
+  width: 50%;
 }
 </style>

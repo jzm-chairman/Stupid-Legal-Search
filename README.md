@@ -7,6 +7,12 @@
 + 简单的文书详情展示
 + 简单的标签筛选搜索
 
+### 基于BM25的排序器(施工中)
+
+Ranker Version2：在倒排索引中增加字段“score”记录每个查询词在各个文档中出现时的BM25得分，排序时对所有词在相应文档中的score进行简单相加
+
+详情：https://my.oschina.net/stanleysun/blog/1617727
+
 ### 第一个原型
 
 最简单的原型用法：
@@ -20,7 +26,7 @@ Recall & Ranker Version1：
 
 查询词分词后对取出的文档进行排序，第一关键字为出现的查询词数量，第二关键字为查询词的词频
 
-倒排索引结构Version 1：
+倒排索引结构Version 2：
 
 ```json
 temp/inverted_index.json
@@ -28,7 +34,8 @@ temp/inverted_index.json
 	term1(string): {
     	doc1(int): {
             "freq": freq1(int),
-			"offset": [...](list(int))
+			"offset": [...](list(int)),
+			"score": score1(int)
         },
 		doc2: {
             ...
