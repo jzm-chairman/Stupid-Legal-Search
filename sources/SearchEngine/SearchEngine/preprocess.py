@@ -68,7 +68,7 @@ def calculate_BM25(inverted_index, doc_length):
 if __name__ == "__main__":
     doc_files = read_all_doc_files(base_path)
     inverted_index = defaultdict(dict)
-    doc_files = doc_files[:1000]
+    # doc_files = doc_files[:1000]
     doc_files = [dir + item for item in doc_files]
     doc_length = np.zeros(len(doc_files)) # 记录文档长度(BM25用)
     with tqdm(total=len(doc_files), desc="Constructing Inverted Index") as pbar:

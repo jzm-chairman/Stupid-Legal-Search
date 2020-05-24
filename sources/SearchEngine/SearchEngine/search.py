@@ -20,9 +20,11 @@ summary_cache = LRUCache(maxsize=MAX_CACHE_SIZE)
 document_cache = LRUCache(maxsize=MAX_CACHE_SIZE)
 
 def filters(doc_recall, condition, doc_files):
+    if not condition:
+        return doc_recall
     ret = []
     for doc in doc_recall:
-        detail = get_single_detail(doc, doc_files)
+        detail = get_single_detail(doc, doc_files, [])
         flag = True
         for key in condition:
             if key not in detail or detail[key] != condition[key]:
@@ -52,6 +54,8 @@ def rank(doc_recall, words, inverted_index):
         if word not in inverted_index:
             continue
         for doc in doc_recall:
+            if str(doc) not in inverted_index[word]:
+                continue
             scores[local_doc_index[doc]] += inverted_index[word][str(doc)]["score"]
     doc_rank = [doc_recall[i] for i in scores.argsort()[::-1]]
     return doc_rank
@@ -85,23 +89,25 @@ def get_summary(doc_index, doc_files):
     rets["statistics"] = statistics
     return rets
 
-def get_single_detail(doc, doc_files):
+def get_single_detail(doc, doc_files, words):
     if doc in document_cache:
         return document_cache[doc]
     root = parse(doc_files[doc]).documentElement
-    keys = ["WS", "JBFY", "AH", "CPSJ", "DSR", "SSJL", "AJJBQK", "CPFXGC", "PJJG", "BSPJJG", "WW", "AJLB", "SPCX", "WSZL", "XZQH_P", "JAND"]
-    # 文首，经办法院，案号，裁判时间，当事人，诉讼记录，案件基本情况，裁判分析过程，判决结果，本审判决结果，文尾，案件类别，审判程序，行政区划(省)，结案年度
+    keys = ["WS", "JBFY", "AH", "CPSJ", "DSR", "DSRD", "SSJL", "AJJBQK", "AJJBQKD", "AJSSD", "CPFXGC", "QSFXD", "PJJG", "BSPJJG", "WW", "AJLB", "SPCX", "WSZL", "XZQH_P", "JAND"]
+    # 文首，经办法院，案号，裁判时间，当事人，当事人段，诉讼记录，案件基本情况，案件基本情况段，案件事实段，裁判分析过程，起诉分析段，判决结果，本审判决结果，文尾，案件类别，审判程序，文书种类，行政区划(省)，结案年度
+    escape_keys = {"AJLB", "SPCX", "WSZL", "XZQH_P", "JAND"}  # 不需要加格式的字段
     item = {}
+    item["filename"] = doc_files[doc]
     for xml_key in keys:
         elems = root.getElementsByTagName(xml_key)
         if len(elems) == 0:
             continue
+        # print(xml_key)
         key_cn = elems[0].getAttribute("nameCN")
         value = elems[0].getAttribute("value")
-        if xml_key != "WS":
-            value = value.strip().replace(" ", "<br>")
         item[key_cn] = value
     document_cache[doc] = item
+    # print(document_cache[doc])
     return item
 
 
