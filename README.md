@@ -4,8 +4,23 @@
 ### 已经支持的功能(置顶)
 
 + 简单的关键词搜索
++ 基于BM25的结果排序
++ 搜索结果的可调分页展示
 + 简单的文书详情展示
 + 简单的标签筛选搜索
+
+### 可能需要解决的问题
+
++ 冷启动速度过于缓慢
++ 前端排版过于丑陋
++ 类似案件搜索没有想法
++ 搜索词引导可能实现困难
+
+### 基于BM25的排序器(待完善)
+
+Ranker Version2：在倒排索引中增加字段“score”记录每个查询词在各个文档中出现时的BM25得分，排序时对所有词在相应文档中的score进行简单相加
+
+详情：https://my.oschina.net/stanleysun/blog/1617727
 
 ### 第一个原型
 
@@ -20,7 +35,7 @@ Recall & Ranker Version1：
 
 查询词分词后对取出的文档进行排序，第一关键字为出现的查询词数量，第二关键字为查询词的词频
 
-倒排索引结构Version 1：
+倒排索引结构Version 2：
 
 ```json
 temp/inverted_index.json
@@ -28,7 +43,8 @@ temp/inverted_index.json
 	term1(string): {
     	doc1(int): {
             "freq": freq1(int),
-			"offset": [...](list(int))
+			"offset": [...](list(int)),
+			"score": score1(int)
         },
 		doc2: {
             ...

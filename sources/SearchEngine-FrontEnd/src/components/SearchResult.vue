@@ -41,6 +41,18 @@
                     </div>
                 </template>
             </div>
+            <div class="pagination">
+              <el-pagination
+                layout="total, sizes, prev, pager, next, jumper"
+                :page-sizes="[10,20,50,100]"
+                :page-size="pagesize"
+                :current-page="pageindex"
+                :total="total"
+                background
+                @size-change="change_page_size"
+                @current-change="change_page_index"
+              ></el-pagination>
+            </div>
         </div>
     </div>
 </template>
@@ -56,29 +68,39 @@ export default {
       statistics: {},
       filters: {
         searchkey: ''
-      }
+      },
+      total: 0,
+      pageindex: 1,
+      pagesize: 10
     }
   },
   created () {
     this.filters = this.$route.query
-    GET('/search', this.filters).then(response => {
-      this.searchresult = response.results
-      this.statistics = response.statistics
-    })
+    this.fetch_data()
   },
   computed: {
   },
   methods: {
-    search () {
-      console.log(this.$route.query, this.filters)
-      this.$router.push({query: merge(this.$route.query, this.filters)})
-      GET('/search', this.filters).then(response => {
+    fetch_data () {
+      var params = JSON.parse(JSON.stringify(this.filters))
+      params.pageindex = this.pageindex
+      params.pagesize = this.pagesize
+      GET('/search', params).then(response => {
         this.searchresult = response.results
         this.statistics = response.statistics
+        this.total = response.total
       })
     },
+    search () {
+      console.log(this.$route.query, this.filters)
+      this.pageindex = 1
+      if (this.$route.query !== this.filters) {
+        this.$router.push({query: merge(this.$route.query, this.filters)})
+      }
+      this.fetch_data()
+    },
     detail_url (index) {
-      return 'detail?index=' + String(index)
+      return 'detail?index=' + String(index) + '&searchkey=' + this.filters.searchkey
     },
     add_filter (key, value) {
       this.filters[key] = value
@@ -90,6 +112,14 @@ export default {
       }
       this.$router.push({query: {}})
       this.search()
+    },
+    change_page_size (val) {
+      this.pagesize = val
+      this.fetch_data()
+    },
+    change_page_index (val) {
+      this.pageindex = val
+      this.fetch_data()
     }
   }
 }
@@ -123,13 +153,15 @@ export default {
         color: #666;
     }
 .sidebar {
-    left: 0;
     float: left;
+    padding: 0 0 0 10px;
 }
 .sidebar-menu {
-
+  width: 300px;
 }
 .right {
-    float: right;
+  float: right;
+  padding: 0 100px 0 0;
+  width: 60%;
 }
 </style>
