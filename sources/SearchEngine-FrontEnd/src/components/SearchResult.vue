@@ -32,9 +32,9 @@
                     <el-button type="primary" @click="search" slot="append">搜索</el-button>
                 </el-input>
             </div>
-            <div class="searchresult">
+            <div class="search-result">
                 <template v-for="item in searchresult">
-                    <div v-bind:key="item.index">
+                    <div class="search-item" v-bind:key="item.index">
                         <a id="title" v-bind:key="item.index" v-bind:href="detail_url(item.index)" target="_blank" class="title">
                             {{ item.文首 }}
                         </a>
@@ -163,5 +163,11 @@ export default {
   float: right;
   padding: 0 100px 0 0;
   width: 60%;
+}
+.search-item {
+  padding: 10px;
+}
+.search-result {
+  padding: 20px;
 }
 </style>

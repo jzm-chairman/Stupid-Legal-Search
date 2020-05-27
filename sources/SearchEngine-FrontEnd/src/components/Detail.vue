@@ -1,20 +1,21 @@
 <template>
-    <div>
+    <div class="page">
         <div class="title">
-            <div v-html="detail.文首"></div>
+            <div class="realtitle" v-html="detail.文首"></div>
             <div>
                 <span v-html="detail.经办法院"></span>
-                <span> | </span>
+                <span>  |  </span>
                 <span v-html="detail.案号"></span>
-                <span> | </span>
+                <span>  |  </span>
                 <span v-html="detail.裁判时间"></span>
             </div>
         </div>
+        <el-divider></el-divider>
         <div class="content">
             <template v-for="key in showkeys">
                 <div v-bind:key="key" v-if="key in detail">
-                    <div v-html="key"></div>
-                    <div v-html="detail[key]"></div>
+                    <div class="subtitle" v-html="key"></div>
+                    <div class="detail" v-html="detail[key]"></div>
                 </div>
             </template>
         </div>
@@ -23,6 +24,7 @@
 
 <script>
 import { GET } from '../api/index'
+import { replaceAll } from '../api/utils'
 export default {
   name: 'detail',
   data () {
@@ -49,10 +51,12 @@ export default {
   },
   methods: {
     render (value) {
-      value = value.replace(' ', '<br>')
+      if (value === null) return null
+      value = value.trim()
+      value = replaceAll(value, ' ', '<br>')
       for (var i in this.searchcut) {
         var word = this.searchcut[i]
-        value = value.replace(word, '<span style="color:red">' + word + '</span>')
+        value = replaceAll(value, word, '<span style="color:red">' + word + '</span>')
       }
       return value
     }
@@ -63,5 +67,26 @@ export default {
 <style scoped>
 .content {
     text-align: left;
+    padding: 10px;
+}
+.page {
+  width: 80%;
+  margin: 0 auto;
+  line-height: 30px;
+}
+.subtitle {
+  border-left: 10px solid #1e90ff;
+  padding-left: 20px;
+  font-size: 24px;
+  font-weight: bold;
+}
+.detail {
+  padding-bottom: 20px;
+  padding-top: 20px;
+}
+.realtitle {
+  font-size: 32px;
+  font-weight: bolder;
+  padding: 20px;
 }
 </style>
