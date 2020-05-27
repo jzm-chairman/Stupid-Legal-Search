@@ -2,16 +2,20 @@ import os
 import re
 from xml.dom.minidom import parse
 import pickle
-import json
 from tqdm import tqdm
 import thulac
+from random import shuffle
+# import mongoengine
 from collections import defaultdict
 import numpy as np
+import pymongo
+import sys
 
-cutter = thulac.thulac(seg_only=True)
+cutter = thulac.thulac(seg_only=True, filt=True)
 
-dir = "../../../"
-base_path = [dir + item for item in ["xml_1", "xml_2", "xml_3"]]
+dir = "../../../../" # change it for data file path
+base_path = [dir + item for item in ["xml_1", "xml_2", "xml_3", "xml_4"]]
+
 
 def traverse(path, pattern, store):
     for item in os.listdir(path):
@@ -19,8 +23,13 @@ def traverse(path, pattern, store):
         if os.path.isfile(item_path):
             if pattern in item:
                 store.append(item_path)
+                global file_num
+                file_num += 1
+                if file_num % 1000 == 0:
+                    print('file_num: {}'.format(file_num))
         else:
             traverse(item_path, pattern, store)
+
 
 def read_all_doc_files(base):
     doc_files = []
@@ -30,18 +39,29 @@ def read_all_doc_files(base):
         doc_files = pickle.load(open(filename_cache, "rb"))
     else:
         print('cache not exist')
+        if not os.path.exists(dir + "temp"):
+            os.mkdir(dir + "temp")
         for i, path in enumerate(base):
+            print('traverse @ ' + str(i))
             traverse(path, ".xml", doc_files)
+        print('#File: ' + str(len(doc_files)))
         pickle.dump(doc_files, open(filename_cache, "wb"))
     return doc_files
 
-def construct_inverted_index(text_list, doc_num, inverted_index):
-    for i, (term, offset) in enumerate(text_list):
-        if doc_num not in inverted_index[term]:
-            inverted_index[term][doc_num] = {"freq": 0, "offset": []}
-        inverted_index[term][doc_num]["freq"] += 1
-        inverted_index[term][doc_num]["offset"].append(offset)
-    return inverted_index
+
+def update_inverted_index(text_list, doc_num, inverted_index_dict, appear_list):
+    appear_dict = {}
+    for term, _ in text_list:
+        if term not in appear_dict.keys():
+            appear_dict[term] = {'pid': doc_num, 'freq': 0, 'score': 0}
+        appear_dict[term]['freq'] += 1
+    global appear_num
+    for (term, appear) in appear_dict.items():
+        # appear['aid'] = appear_num
+        appear_list += [appear]
+        inverted_index_dict[term] += [appear_num]
+        appear_num += 1
+
 
 def tag_offset(text_list):
     assert len(text_list[0]) == 2
@@ -51,44 +71,122 @@ def tag_offset(text_list):
         offset += len(text_list[i][0])
     return text_list
 
-def calculate_BM25(inverted_index, doc_length):
-    average_length = np.average(doc_length)
-    total_doc = doc_length.shape[0]
+
+def get_BM25(tf, doc_len, avg_len, total_doc, term_doc):
+    idf = np.log(total_doc / (term_doc + 1))
     k = 2 # 超参数，限制tf对score的影响
     b = 0.5 # 超参数，控制文本长度对score的影响
-    for term, term_docs in inverted_index.items():
-        idf = np.log(total_doc / (len(term_docs) + 1)) # IDF值
-        for doc, info in term_docs.items():
-            tf = info["freq"] # TF值
-            lp = 1 - b + b * doc_length[doc] / average_length # 长度惩罚项
-            tfs = ((k + 1) * tf) / (k * lp + tf) # TF Score
-            info["score"] = idf * tfs
+    lp = 1 - b + b * doc_len / avg_len # 长度惩罚项
+    tfs = ((k + 1) * tf) / (k * lp + tf) # TF Score
+    return idf * tfs
+
+
+def trim_and_cut(text):
+    text = re.split(r"[^0-9\u4e00-\u9af5]", text)
+    return text
+
+
+def extract_appearance(db, doc_files):
+    collection_appearance = db['Appearance']
+    appear_list = []
+    inverted_index_dict = defaultdict(list)
+    doc_length = np.zeros(len(doc_files)) # 记录文档长度(BM25用)
+    offset_size = 0
+    global appear_num
+    appear_num = 0
+    with tqdm(total=len(doc_files), desc="Extracting Appearances") as pbar:
+        for i, file in enumerate(doc_files):
+            try:
+                root = parse(file).documentElement
+                full_text = root.getElementsByTagName("QW")
+                full_text = full_text[0].getAttribute("value")
+            except Exception:
+                pbar.update(1)
+                continue
+            seg_list = trim_and_cut(full_text)
+            full_text_list = []
+            for seg_text in seg_list:
+                full_text_list += cutter.cut(seg_text)
+            doc_length[i] = len(full_text_list)
+            offset_size += len(full_text_list)
+
+            update_inverted_index(full_text_list, i, inverted_index_dict, appear_list)
+
+            # if len(appear_list) > 100000 or pbar.n + 1 == pbar.total:
+            #     collection_appearance.insert_many(appear_list)
+            #     appear_list = []
+            if i % 50 == 0:
+                print("offset_size: " + str(offset_size))
+                print("appear_num: " + str(appear_num))
+                print("term_num: " + str(len(inverted_index_dict.keys())))
+            pbar.update(1)
+    return doc_length, inverted_index_dict, appear_list
+
+
+def construct_inverted_index(db, doc_length, inverted_index_dict, appear_list):
+    collection_appearance = db['Appearance']
+    collection_inverted_index = db['InvertedIndex']
+    wait_list = []
+    avg_doc_len = np.average(doc_length)
+    total_doc = len(doc_length)
+    appear_cnt = 0
+
+    with tqdm(total=len(inverted_index_dict.keys()), desc="Constructing Inverted Index") as pbar:
+        for term, appear_id_list in inverted_index_dict.items():
+            inverted_index = {'term': term, 'appear_list': []}
+            for aid in appear_id_list:
+                # appear = collection_appearance.find_one({'aid': aid})
+                appear = appear_list[aid]
+                score = get_BM25(appear['freq'], doc_length[appear['pid']], avg_doc_len, total_doc, len(appear_list))
+                # collection_appearance.update_one({'aid': aid}, {'$set' : {'score' : score}})
+                appear['score'] = score
+                inverted_index['appear_list'].append(appear)
+                appear_cnt += 1
+            wait_list.append(inverted_index)
+            if appear_cnt > 100000 or pbar.n + 1 == pbar.total:
+                print("insert_many InvertedIndex")
+                collection_inverted_index.insert_many(wait_list)
+                wait_list = []
+            pbar.update(1)
+
+
+def extract_paper_labels(db, doc_files):
+    collection_paper = db['Paper']
+    label_elements = ['AJLB', 'SPCX', 'WSZL', 'XZQH_P', 'JAND']
+    wait_list = []
+    paper_cnt = 0
+    with tqdm(total=len(doc_files), desc="Extracting Paper Labels") as pbar:
+        for i, file in enumerate(doc_files):
+            paper_dict = {}
+            try:
+                root = parse(file).documentElement
+                paper_dict['path'] = file
+                for label in label_elements:
+                    paper_dict[label] = root.getElementsByTagName(label)[0].getAttribute("value")
+            except Exception:
+                pbar.update(1)
+                continue
+            wait_list.append(paper_dict)
+            paper_cnt += 1
+            if len(wait_list) > 10000 or pbar.n + 1 == pbar.total:
+                print("insert_many paper")
+                collection_paper.insert_many(wait_list)
+                wait_list = []
+            if i % 50 == 0:
+                print("Paper cnt: {}".format(paper_cnt))
+            pbar.update(1)
 
 
 if __name__ == "__main__":
     doc_files = read_all_doc_files(base_path)
-    inverted_index = defaultdict(dict)
-    # doc_files = doc_files[:1000]
-    doc_files = [dir + item for item in doc_files]
-    doc_length = np.zeros(len(doc_files)) # 记录文档长度(BM25用)
-    with tqdm(total=len(doc_files), desc="Constructing Inverted Index") as pbar:
-        for i, file in enumerate(doc_files):
-            root = parse(file).documentElement
-            full_text = root.getElementsByTagName("QW")
-            if len(full_text) == 0:
-                continue
-            full_text = full_text[0].getAttribute("value")
-            #print(full_text)
-            full_text_list = cutter.cut(full_text)
-            full_text_list = tag_offset(full_text_list)
-            full_text_list = list(filter(lambda x: re.match(r"[0-9\u4e00-\u9af5]", x[0]) is not None, full_text_list))
-            doc_length[i] = len(full_text_list)
-            #print(full_text_list)
-            inverted_index = construct_inverted_index(full_text_list, i, inverted_index)
-            pbar.update(1)
-    # 预计算BM25 Score
-    calculate_BM25(inverted_index, doc_length)
-    save_file = dir + "temp/inverted_index.json"
+    shuffle(doc_files)
+    doc_files = [item for item in doc_files]
+    doc_files = doc_files[:1000]
+    print('#File: ' + str(len(doc_files)))
 
-    with open(save_file, "w+", encoding="utf-8") as f:
-        f.write(json.dumps(inverted_index, indent=2, ensure_ascii=False))
+    client = pymongo.MongoClient(host="localhost", port=27017)
+    db = client['SearchEngine']
+
+    extract_paper_labels(db, doc_files)
+    # doc_length, inverted_index_dict, appear_list = extract_appearance(db, doc_files)
+    # construct_inverted_index(db, doc_length, inverted_index_dict, appear_list)
