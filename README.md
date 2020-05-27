@@ -31,32 +31,39 @@ python preprocess.py 生成文件列表和倒排索引(暂时只用100篇)
 python search.py 输入关键词搜索
 ```
 
-Recall & Ranker Version1：
+数据库结构：
 
-查询词分词后对取出的文档进行排序，第一关键字为出现的查询词数量，第二关键字为查询词的词频
-
-倒排索引结构Version 2：
-
-```json
-temp/inverted_index.json
+```
+Appearance (7kw)
 {
-	term1(string): {
-    	doc1(int): {
-            "freq": freq1(int),
-			"offset": [...](list(int)),
-			"score": score1(int)
-        },
-		doc2: {
-            ...
-        }
-	},
-	term2(string): {
-        ...(同上)
-    }
+	'pid': (int),
+	'freq': (int),
+	'score': (float)
+}
+
+InvertedIndex (100w)
+{
+	'term': (string),
+	'appear_list': [Appearace, ...]
+}
+
+Paper(16w)
+{
+	'pid': (int), 
+	'path': (string),
+	'AJLB': (string), # 案件类别
+	'SPCX': (string), # 审判程序
+	'WSZL': (string), # 文书类别
+	'CPSJ': (string), # 裁判时间
+	'XZQH_P': (string), # 行政区划（省）
+	'XZQH_C': (string), # 行政区划（市）
+	'XZQH_CC': (string), # 行政区划（区县）
+	'JBFY': (string), # 经办法院
+	'FGRYWZ ': (string) # 法官成员完整
 }
 ```
 
-记录所有文书所在的相对路径的文件：
+记录所有文书所在的**绝对路径**的文件：
 
 ```
 temp/filename.pkl
@@ -76,8 +83,6 @@ mongoimport --db SearchEngine --collection InvertedIndex --file sources/temp/inv
 ```bash
 python manage.py runserver
 ```
-
-访问`127.0.0.1:8000/query?term=$your term$`可以获取对应的倒排索引列表。
 
 ## 有前端了
 

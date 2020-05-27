@@ -85,7 +85,7 @@ export default {
       var params = JSON.parse(JSON.stringify(this.filters))
       params.pageindex = this.pageindex
       params.pagesize = this.pagesize
-      GET('/search', params).then(response => {
+      GET('/search/', params).then(response => {
         this.searchresult = response.results
         this.statistics = response.statistics
         this.total = response.total

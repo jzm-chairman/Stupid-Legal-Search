@@ -23,7 +23,7 @@ MAX_CACHE_SIZE = 1000
 summary_cache = LRUCache(maxsize=MAX_CACHE_SIZE)
 document_cache = LRUCache(maxsize=MAX_CACHE_SIZE)
 # doc_files = [root_dir + file for file in pickle.loads(open(doc_files_store, "rb").read()]
-
+cn_to_key = {'案件类别': 'AJLB', '审判程序': 'SPCX', '文书种类': 'WSZL', '行政区划(省)': 'XZQH_P', '结案年度': 'JAND'}
 
 def get_inverted_index(term):
     return collection_inverted_index.find_one({'term': term})
@@ -40,12 +40,12 @@ def filters(doc_recall, condition):
     for doc_id in doc_recall:
         doc_info = get_paper_info(doc_id)
         flag = True
-        for key in condition:
-            if doc_info[key] != condition[key]:
+        for cn_key in condition:
+            if doc_info[cn_to_key[cn_key]] != condition[cn_key]:
                 flag = False
                 break
         if flag:
-            ret.append(doc_info)
+            ret.append(doc_info['pid'])
     return ret
 
 
@@ -60,8 +60,8 @@ def recall(words):
 
 
 # def rank(doc_recall):
-#     # rank第一关键字：出现的查询词数，第二关键字：出现查询词的词频
-#     return [item[0] for item in sorted(list(doc_recall.items()), key=lambda x: (-x[1][0], -x[1][1]))]
+#     rank关键字BM25 score
+#     返回pid列表
 def rank(doc_recall, words):
     local_doc_index = {pid: index for (index, pid) in enumerate(doc_recall)} # 方便计算分数用的
     scores = np.zeros(len(doc_recall))
@@ -119,12 +119,10 @@ def get_single_detail(doc, words):
         elems = root.getElementsByTagName(xml_key)
         if len(elems) == 0:
             continue
-        # print(xml_key)
         key_cn = elems[0].getAttribute("nameCN")
         value = elems[0].getAttribute("value")
         item[key_cn] = value
     document_cache[doc] = item
-    # print(document_cache[doc])
     return item
 
 
@@ -139,6 +137,7 @@ def main_loop():
             print("Doc", doc_index[i])
             print(content)
         print("Find {} Items: {} / {}".format(len(doc_recall), doc_recall, doc_index))
+
 
 if __name__ == "__main__":
     # doc_files, inverted_index = unpack_info(doc_files_store, inverted_index_store)

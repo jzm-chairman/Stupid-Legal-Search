@@ -37,7 +37,7 @@ export default {
   computed: {
   },
   created () {
-    GET('/detail', this.$route.query).then(result => {
+    GET('/detail/', this.$route.query).then(result => {
       this.detail = result
       this.searchcut = result.searchcut
       delete this.detail.searchcut

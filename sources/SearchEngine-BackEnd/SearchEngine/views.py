@@ -8,6 +8,7 @@ from .search import *
 # doc_files, inverted_index = unpack_info(doc_files_store, inverted_index_store)
 # doc_files = ["../../" + file for file in doc_files]
 
+
 def response(body):
     responses = HttpResponse(body)
     responses["Access-Control-Allow-Origin"] = "*"

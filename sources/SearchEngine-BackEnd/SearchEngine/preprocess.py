@@ -13,7 +13,8 @@ import sys
 
 cutter = thulac.thulac(seg_only=True, filt=True)
 
-dir = "../../../../" # change it for data file path
+# dir = "../../../../" # change it for data file path
+dir = 'E:\\Tsinghua\\2020_spring\\SearchEngine\\Project\\' # 使用绝对路径
 base_path = [dir + item for item in ["xml_1", "xml_2", "xml_3", "xml_4"]]
 
 
@@ -32,6 +33,8 @@ def traverse(path, pattern, store):
 
 
 def read_all_doc_files(base):
+    global file_num
+    file_num = 0
     doc_files = []
     filename_cache = dir + "temp/filename.pkl"
     if os.path.exists(filename_cache):
@@ -57,7 +60,6 @@ def update_inverted_index(text_list, doc_num, inverted_index_dict, appear_list):
         appear_dict[term]['freq'] += 1
     global appear_num
     for (term, appear) in appear_dict.items():
-        # appear['aid'] = appear_num
         appear_list += [appear]
         inverted_index_dict[term] += [appear_num]
         appear_num += 1
@@ -86,23 +88,46 @@ def trim_and_cut(text):
     return text
 
 
-def extract_appearance(db, doc_files):
-    collection_appearance = db['Appearance']
+def parse_paper(file_path, pid):
+    label_elements = ['AJLB', 'SPCX', 'WSZL', 'CPSJ', 'XZQH_P', 'XZQH_C', 'XZQH_CC', 'JBFY', 'FGRYWZ']
+    paper_dict = {}
+    root = parse(file_path).documentElement
+    full_text = root.getElementsByTagName("QW")
+    if len(full_text) == 0:
+        return None, None
+    full_text = full_text[0].getAttribute("value")
+
+    paper_dict['path'] = file_path
+    paper_dict['pid'] = pid
+    for label in label_elements:
+        try:
+            if label == 'FGRYWZ':
+                paper_dict[label] = [x.getAttribute("value") for x in root.getElementsByTagName(label)]
+            else:
+                paper_dict[label] = root.getElementsByTagName(label)[0].getAttribute("value")
+        except Exception:
+            paper_dict[label] = ''
+    return full_text, paper_dict
+
+
+def extract_appearance_and_labels(db, doc_files):
+    collection_paper = db['Paper']
     appear_list = []
+    paper_list = []
     inverted_index_dict = defaultdict(list)
     doc_length = np.zeros(len(doc_files)) # 记录文档长度(BM25用)
     offset_size = 0
     global appear_num
     appear_num = 0
-    with tqdm(total=len(doc_files), desc="Extracting Appearances") as pbar:
+    paper_num = 0
+    with tqdm(total=len(doc_files), desc="Extracting Appearances and Labels") as pbar:
         for i, file in enumerate(doc_files):
-            try:
-                root = parse(file).documentElement
-                full_text = root.getElementsByTagName("QW")
-                full_text = full_text[0].getAttribute("value")
-            except Exception:
+            full_text, paper_dict = parse_paper(file, paper_num)
+            if full_text is None:
                 pbar.update(1)
                 continue
+            paper_num += 1
+            paper_list.append(paper_dict)
             seg_list = trim_and_cut(full_text)
             full_text_list = []
             for seg_text in seg_list:
@@ -111,20 +136,20 @@ def extract_appearance(db, doc_files):
             offset_size += len(full_text_list)
 
             update_inverted_index(full_text_list, i, inverted_index_dict, appear_list)
-
-            # if len(appear_list) > 100000 or pbar.n + 1 == pbar.total:
-            #     collection_appearance.insert_many(appear_list)
-            #     appear_list = []
-            if i % 50 == 0:
+            if len(paper_list) > 10000 or pbar.n + 1 == pbar.total:
+                print("insert_many Paper")
+                collection_paper.insert_many(paper_list)
+                paper_list = []
+            if (i + 1) % 50 == 0:
                 print("offset_size: " + str(offset_size))
                 print("appear_num: " + str(appear_num))
                 print("term_num: " + str(len(inverted_index_dict.keys())))
+                print("paper_num: " + str(paper_num))
             pbar.update(1)
     return doc_length, inverted_index_dict, appear_list
 
 
 def construct_inverted_index(db, doc_length, inverted_index_dict, appear_list):
-    collection_appearance = db['Appearance']
     collection_inverted_index = db['InvertedIndex']
     wait_list = []
     avg_doc_len = np.average(doc_length)
@@ -135,10 +160,8 @@ def construct_inverted_index(db, doc_length, inverted_index_dict, appear_list):
         for term, appear_id_list in inverted_index_dict.items():
             inverted_index = {'term': term, 'appear_list': []}
             for aid in appear_id_list:
-                # appear = collection_appearance.find_one({'aid': aid})
                 appear = appear_list[aid]
                 score = get_BM25(appear['freq'], doc_length[appear['pid']], avg_doc_len, total_doc, len(appear_list))
-                # collection_appearance.update_one({'aid': aid}, {'$set' : {'score' : score}})
                 appear['score'] = score
                 inverted_index['appear_list'].append(appear)
                 appear_cnt += 1
@@ -150,43 +173,16 @@ def construct_inverted_index(db, doc_length, inverted_index_dict, appear_list):
             pbar.update(1)
 
 
-def extract_paper_labels(db, doc_files):
-    collection_paper = db['Paper']
-    label_elements = ['AJLB', 'SPCX', 'WSZL', 'XZQH_P', 'JAND']
-    wait_list = []
-    paper_cnt = 0
-    with tqdm(total=len(doc_files), desc="Extracting Paper Labels") as pbar:
-        for i, file in enumerate(doc_files):
-            paper_dict = {}
-            try:
-                root = parse(file).documentElement
-                paper_dict['path'] = file
-                for label in label_elements:
-                    paper_dict[label] = root.getElementsByTagName(label)[0].getAttribute("value")
-            except Exception:
-                pbar.update(1)
-                continue
-            wait_list.append(paper_dict)
-            paper_cnt += 1
-            if len(wait_list) > 10000 or pbar.n + 1 == pbar.total:
-                print("insert_many paper")
-                collection_paper.insert_many(wait_list)
-                wait_list = []
-            if i % 50 == 0:
-                print("Paper cnt: {}".format(paper_cnt))
-            pbar.update(1)
-
-
 if __name__ == "__main__":
     doc_files = read_all_doc_files(base_path)
     shuffle(doc_files)
     doc_files = [item for item in doc_files]
-    doc_files = doc_files[:1000]
+    # doc_files = doc_files[:1000]
     print('#File: ' + str(len(doc_files)))
 
     client = pymongo.MongoClient(host="localhost", port=27017)
     db = client['SearchEngine']
 
-    extract_paper_labels(db, doc_files)
-    # doc_length, inverted_index_dict, appear_list = extract_appearance(db, doc_files)
-    # construct_inverted_index(db, doc_length, inverted_index_dict, appear_list)
+    # extract_paper_labels(db, doc_files)
+    doc_length, inverted_index_dict, appear_list = extract_appearance_and_labels(db, doc_files)
+    construct_inverted_index(db, doc_length, inverted_index_dict, appear_list)
