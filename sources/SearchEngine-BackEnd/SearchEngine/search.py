@@ -23,7 +23,9 @@ MAX_CACHE_SIZE = 1000
 summary_cache = LRUCache(maxsize=MAX_CACHE_SIZE)
 document_cache = LRUCache(maxsize=MAX_CACHE_SIZE)
 # doc_files = [root_dir + file for file in pickle.loads(open(doc_files_store, "rb").read()]
-cn_to_key = {'案件类别': 'AJLB', '审判程序': 'SPCX', '文书种类': 'WSZL', '行政区划(省)': 'XZQH_P', '结案年度': 'JAND'}
+cn_to_key = {'案件类别': 'AJLB', '审判程序': 'SPCX', '文书种类': 'WSZL', '行政区划(省)': 'XZQH_P', '结案年度': 'JAND',
+             '裁判时间': 'CPSJ', '行政区划(市)': 'XZQH_C', '行政区划(区县)': 'XZQH_CC',
+             '经办法院': 'JBFY', 'FGRYWZ': '法官人员完整'}
 
 def get_inverted_index(term):
     return collection_inverted_index.find_one({'term': term})
