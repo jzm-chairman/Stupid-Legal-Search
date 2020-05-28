@@ -90,7 +90,7 @@ def trim_and_cut(text):
 
 
 def parse_paper(file_path, pid):
-    label_elements = ['AJLB', 'SPCX', 'WSZL', 'CPSJ', 'XZQH_P', 'XZQH_C', 'XZQH_CC', 'JBFY', 'FGRYWZ', 'JAND']
+    label_elements = ['AJLB', 'SPCX', 'WSZL', 'CPSJ', 'JAND', 'XZQH_P', 'XZQH_C', 'XZQH_CC', 'JBFY', 'FGRYWZ', 'WS']
     paper_dict = {}
     try:
         root = parse(file_path).documentElement
@@ -144,7 +144,7 @@ def extract_appearance_and_labels(db, doc_files):
                 print("insert_many Paper")
                 collection_paper.insert_many(paper_list)
                 paper_list = []
-            if (i + 1) % 50 == 0:
+            if (i + 1) % 100 == 0:
                 print("offset_size: " + str(offset_size))
                 print("appear_num: " + str(appear_num))
                 print("term_num: " + str(len(inverted_index_dict.keys())))
@@ -164,7 +164,7 @@ def construct_inverted_index(db, doc_length, inverted_index_dict, appear_list):
             inverted_index = {'term': term, 'appear_list': []}
             for aid in appear_id_list:
                 appear = appear_list[aid]
-                score = get_BM25(appear['freq'], doc_length[appear['pid']], avg_doc_len, total_doc, len(appear_list))
+                score = get_BM25(appear['freq'], doc_length[appear['pid']], avg_doc_len, total_doc, len(appear_id_list))
                 appear['score'] = score
                 inverted_index['appear_list'].append(appear)
                 appear_cnt += 1
@@ -180,7 +180,7 @@ if __name__ == "__main__":
     doc_files = read_all_doc_files(base_path)
     # shuffle(doc_files)
     doc_files = [item for item in doc_files]
-    doc_files = doc_files[:100]
+    doc_files = doc_files[:1000]
     print('#File: ' + str(len(doc_files)))
 
     client = pymongo.MongoClient(host="localhost", port=27017)

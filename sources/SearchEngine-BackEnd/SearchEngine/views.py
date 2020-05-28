@@ -20,7 +20,7 @@ def search(request):
     print('Enter Search')
     start = time.time()
     query = request.GET.get("searchkey")
-    condition = {key: request.GET.get(key) for key in need_stats_keys if request.GET.get(key) is not None}
+    condition = {key: request.GET.get(key) for key in [key_to_cn[key] for key in need_stats_keys] if request.GET.get(key) is not None}
     query_words = list(filter(lambda x: re.match(r"[0-9\u4e00-\u9af5]+", x) is not None, [item[0] for item in cutter.cut(query)]))
     query_words = list(set(query_words))
     print("Preprocess Time: {}s".format(time.time() - start))

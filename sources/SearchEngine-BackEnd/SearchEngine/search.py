@@ -15,15 +15,19 @@ client = pymongo.MongoClient(host="localhost", port=27017)
 db = client['SearchEngine']
 collection_paper = db['Paper']
 collection_inverted_index = db['InvertedIndex']
-need_stats_keys = ["案件类别", "审判程序", "文书种类", "行政区划(省)", "结案年度"]
+# need_stats_keys = ["案件类别", "审判程序", "文书种类", "行政区划(省)", "结案年度"]
+need_stats_keys = ["AJLB", "SPCX", "WSZL", "XZQH_P", "JAND"]
 
 # unpack_info = lambda ds, iis: (pickle.loads(open(ds, "rb").read()), json.loads(open(iis, "r+", encoding="utf-8").read()))
 
-MAX_CACHE_SIZE = 1000
+MAX_CACHE_SIZE = 10000
 summary_cache = LRUCache(maxsize=MAX_CACHE_SIZE)
 document_cache = LRUCache(maxsize=MAX_CACHE_SIZE)
 # doc_files = [root_dir + file for file in pickle.loads(open(doc_files_store, "rb").read()]
-cn_to_key = {'案件类别': 'AJLB', '审判程序': 'SPCX', '文书种类': 'WSZL', '行政区划(省)': 'XZQH_P', '结案年度': 'JAND'}
+cn_to_key = {'案件类别': 'AJLB', '审判程序': 'SPCX', '文书种类': 'WSZL', '行政区划(省)': 'XZQH_P', '结案年度': 'JAND',
+             '裁判时间': 'CPSJ', '行政区划(市)': 'XZQH_C', '行政区划(区县)': 'XZQH_CC',
+             '经办法院': 'JBFY', 'FGRYWZ': '法官人员完整', '文首': 'WS'}
+key_to_cn = {value : key for key, value in cn_to_key.items()}
 
 def get_inverted_index(term):
     return collection_inverted_index.find_one({'term': term})
@@ -32,20 +36,19 @@ def get_inverted_index(term):
 def get_paper_info(pid):
     return collection_paper.find_one({'pid': pid})
 
+def query_by_condition(doc_list, condition):
+    cond = {cn_to_key[key] : value for key, value in condition.items()}
+    cond_index = {"pid": {"$in": doc_list}}
+    return collection_paper.find({**cond_index, **cond}, {"_id": 0, "pid": 1})
+    # return collection_paper.find(cond, {"_id": 0, "pid": 1})
 
 def filters(doc_recall, condition):
     if not condition:
         return doc_recall
-    ret = []
-    for doc_id in doc_recall:
-        doc_info = get_paper_info(doc_id)
-        flag = True
-        for cn_key in condition:
-            if doc_info[cn_to_key[cn_key]] != condition[cn_key]:
-                flag = False
-                break
-        if flag:
-            ret.append(doc_info['pid'])
+    cursor = query_by_condition(doc_recall, condition)
+    # ret = list(set(doc_recall) & {item["pid"] for item in cursor})
+    ret = [item["pid"] for item in cursor]
+    print(len(ret))
     return ret
 
 
@@ -78,27 +81,22 @@ def rank(doc_recall, words):
 
 def get_summary(pid_list):
     # 根据索引获取文档内容
+    normal_keys = ["WS", "CPSJ", "AJLB", "SPCX", "WSZL", "XZQH_P", "JAND"]
+    # 文首，裁判时间，案件类别，审判程序，文书种类，行政区划(省)，结案年度
     rets = {}
     results = []
-    statistics = {key: {} for key in need_stats_keys}
+    statistics = {key_to_cn[key]: {} for key in need_stats_keys}
     for pid in pid_list:
-        item = {}
         if pid not in summary_cache:
-            item['index'] = pid
-            root = parse(get_paper_info(pid)['path']).documentElement
-            normal_keys = ["WS", "CPSJ", "AJLB", "SPCX", "WSZL", "XZQH_P", "JAND"]
-            # 文首，裁判时间，案件类别，审判程序，行政区划(省)
-            for xml_key in normal_keys:
-                elems = root.getElementsByTagName(xml_key)
-                if len(elems) == 0:
-                    continue
-                key_cn = elems[0].getAttribute("nameCN")
-                item[key_cn] = elems[0].getAttribute("value")
+            paper_info = get_paper_info(pid)
+            item = {key_to_cn[key] : paper_info[key] for key in normal_keys}
+            item["index"] = pid
             summary_cache[pid] = item
         item = summary_cache[pid]
         results.append(item)
         for key in need_stats_keys:
-            if key not in item:
+            key = key_to_cn[key]
+            if key not in item or not item[key]:
                 continue
             statistics[key][item[key]] = 1 if item[key] not in statistics[key] else statistics[key][item[key]] + 1
     rets["results"] = results
