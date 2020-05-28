@@ -59,7 +59,7 @@ Paper(16w)
 	'XZQH_C': (string), # 行政区划（市）
 	'XZQH_CC': (string), # 行政区划（区县）
 	'JBFY': (string), # 经办法院
-	'FGRYWZ ': (string) # 法官成员完整
+	'FGRYWZ ': (list) # 法官成员完整
 }
 ```
 

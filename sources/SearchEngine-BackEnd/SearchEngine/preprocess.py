@@ -91,8 +91,11 @@ def trim_and_cut(text):
 def parse_paper(file_path, pid):
     label_elements = ['AJLB', 'SPCX', 'WSZL', 'CPSJ', 'XZQH_P', 'XZQH_C', 'XZQH_CC', 'JBFY', 'FGRYWZ']
     paper_dict = {}
-    root = parse(file_path).documentElement
-    full_text = root.getElementsByTagName("QW")
+    try:
+        root = parse(file_path).documentElement
+        full_text = root.getElementsByTagName("QW")
+    except Exception:
+        return None, None
     if len(full_text) == 0:
         return None, None
     full_text = full_text[0].getAttribute("value")
@@ -166,7 +169,7 @@ def construct_inverted_index(db, doc_length, inverted_index_dict, appear_list):
                 inverted_index['appear_list'].append(appear)
                 appear_cnt += 1
             wait_list.append(inverted_index)
-            if appear_cnt > 100000 or pbar.n + 1 == pbar.total:
+            if len(wait_list) > 5000 or pbar.n + 1 == pbar.total:
                 print("insert_many InvertedIndex")
                 collection_inverted_index.insert_many(wait_list)
                 wait_list = []
@@ -177,7 +180,7 @@ if __name__ == "__main__":
     doc_files = read_all_doc_files(base_path)
     shuffle(doc_files)
     doc_files = [item for item in doc_files]
-    # doc_files = doc_files[:1000]
+    doc_files = doc_files[:5000]
     print('#File: ' + str(len(doc_files)))
 
     client = pymongo.MongoClient(host="localhost", port=27017)
