@@ -110,6 +110,8 @@ def fill_in_summary(results, keywords):
         full_text = get_single_detail(result["index"])["全文"]
         offsets = []
         for word in keywords:
+            if word not in full_text:
+                continue
             index = full_text.index(word)
             offset_word = [index]
             while True:
