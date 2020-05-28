@@ -41,12 +41,16 @@ def search(request):
     # doc_page = doc_rank[page_index*page_size:(page_index+1)*page_size]
     # doc_page = doc_rank
     # print(doc_page)
-    doc_content = get_summary(doc_rank)
+    doc_content = get_meta_info(doc_rank)
     doc_content["total"] = len(doc_rank)
     doc_content["results"] = doc_content["results"][page_index*page_size:(page_index+1)*page_size]
-    print("Summarize Time: {}s".format(time.time() - start))
+    print("Get Meta Info Time: {}s".format(time.time() - start))
     print("Page Size = {}, Page Index = {}".format(page_size, page_index))
     print("Summary Cache Size = {}, Document Cache Size = {}".format(len(summary_cache), len(document_cache)))
+    fill_in_summary(doc_content["results"], query_words)
+    start = time.time()
+    print("Summarize Time: {}s".format(time.time() - start))
+    doc_content["query_words"] = query_words
     return response(json.dumps(doc_content, ensure_ascii=False))
 
 
@@ -57,6 +61,6 @@ def detail(request):
         keywords = set(filter(lambda x: re.match(r"[0-9\u4e00-\u9af5]+", x) is not None, [item[0] for item in cutter.cut(keywords)]))
     else:
         keywords = []
-    doc_content = get_single_detail(index, keywords)
+    doc_content = get_single_detail(index)
     doc_content["searchcut"] = list(keywords)
     return response(json.dumps(doc_content, ensure_ascii=False))

@@ -35,9 +35,12 @@
             <div class="search-result">
                 <template v-for="item in searchresult">
                     <div class="search-item" v-bind:key="item.index">
+                      <div class="item-title">
                         <a id="title" v-bind:key="item.index" v-bind:href="detail_url(item.index)" target="_blank" class="title">
                             {{ item.文首 }}
                         </a>
+                      </div>
+                      <div class="item-summary" v-html="item.摘要"></div>
                     </div>
                 </template>
             </div>
@@ -60,6 +63,7 @@
 <script>
 import { GET } from '../api/index'
 import merge from 'webpack-merge'
+import { replaceAll } from '../api/utils'
 export default {
   name: 'searchresult',
   data () {
@@ -69,6 +73,7 @@ export default {
       filters: {
         searchkey: ''
       },
+      searchkeycut: '',
       total: 0,
       pageindex: 1,
       pagesize: 10
@@ -89,6 +94,10 @@ export default {
         this.searchresult = response.results
         this.statistics = response.statistics
         this.total = response.total
+        this.searchkeycut = response.query_words
+        for (var i in this.searchresult) {
+          this.searchresult[i].摘要 = this.render(this.searchresult[i].摘要)
+        }
       })
     },
     search () {
@@ -120,6 +129,13 @@ export default {
     change_page_index (val) {
       this.pageindex = val
       this.fetch_data()
+    },
+    render (summary) {
+      for (var i in this.searchkeycut) {
+        var word = this.searchkeycut[i]
+        summary = replaceAll(summary, word, '<span style="color:red">' + word + '</span>')
+      }
+      return summary
     }
   }
 }

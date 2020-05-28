@@ -79,7 +79,7 @@ def rank(doc_recall, words):
     return doc_rank
 
 
-def get_summary(pid_list):
+def get_meta_info(pid_list):
     # 根据索引获取文档内容
     normal_keys = ["WS", "CPSJ", "AJLB", "SPCX", "WSZL", "XZQH_P", "JAND"]
     # 文首，裁判时间，案件类别，审判程序，文书种类，行政区划(省)，结案年度
@@ -103,13 +103,43 @@ def get_summary(pid_list):
     rets["statistics"] = statistics
     return rets
 
+SUMMARY_CHARS = 100
 
-def get_single_detail(doc, words):
+def fill_in_summary(results, keywords):
+    for i, result in enumerate(results):
+        full_text = get_single_detail(result["index"])["全文"]
+        offsets = []
+        for word in keywords:
+            index = full_text.index(word)
+            offset_word = [index]
+            while True:
+                try:
+                    index = full_text.index(word, index + len(word))
+                    offset_word.append(index)
+                except ValueError as e:
+                    break
+            offsets.extend(offset_word)
+        offsets.sort()
+        selection_index, max_word_count = 0, 0
+        # slide window start, slide window end
+        swe = 0
+        for sws in range(len(offsets)):
+            while swe < len(offsets) and offsets[swe] - offsets[sws] < SUMMARY_CHARS:
+                swe += 1
+            if swe - sws > max_word_count:
+                max_word_count = swe - sws
+                selection_index = sws
+        slice_start, slice_end = offsets[selection_index], offsets[selection_index + max_word_count - 1]
+        slice_start = max(0, slice_start - max(0, int((SUMMARY_CHARS - (slice_end - slice_start)) / 2)))
+        result["摘要"] = ("..." if slice_start > 0 else "") + full_text[slice_start:slice_start+SUMMARY_CHARS] + ("..." if slice_start + SUMMARY_CHARS < len(full_text) else "")
+
+
+def get_single_detail(doc):
     if doc in document_cache:
         return document_cache[doc]
     root = parse(get_paper_info(doc)['path']).documentElement
-    keys = ["WS", "JBFY", "AH", "CPSJ", "DSR", "DSRD", "SSJL", "AJJBQK", "AJJBQKD", "AJSSD", "CPFXGC", "QSFXD", "PJJG", "BSPJJG", "WW", "AJLB", "SPCX", "WSZL", "XZQH_P", "JAND"]
-    # 文首，经办法院，案号，裁判时间，当事人，当事人段，诉讼记录，案件基本情况，案件基本情况段，案件事实段，裁判分析过程，起诉分析段，判决结果，本审判决结果，文尾，案件类别，审判程序，文书种类，行政区划(省)，结案年度
+    keys = ["QW", "WS", "JBFY", "AH", "CPSJ", "DSR", "DSRD", "SSJL", "AJJBQK", "AJJBQKD", "AJSSD", "CPFXGC", "QSFXD", "PJJG", "BSPJJG", "WW", "AJLB", "SPCX", "WSZL", "XZQH_P", "JAND"]
+    # 全文，文首，经办法院，案号，裁判时间，当事人，当事人段，诉讼记录，案件基本情况，案件基本情况段，案件事实段，裁判分析过程，起诉分析段，判决结果，本审判决结果，文尾，案件类别，审判程序，文书种类，行政区划(省)，结案年度
     escape_keys = {"AJLB", "SPCX", "WSZL", "XZQH_P", "JAND"}  # 不需要加格式的字段
     item = {}
     item["filename"] = get_paper_info(doc)['path']
@@ -130,7 +160,7 @@ def main_loop():
         target = list(filter(lambda x: re.match(r"[0-9\u4e00-\u9af5]+", x) is not None, [item[0] for item in cutter.cut(target)]))
         doc_recall = recall(target)
         doc_index = rank(doc_recall)
-        doc_content = get_summary(doc_index)
+        doc_content = get_meta_info(doc_index)
         for i, content in enumerate(doc_content):
             print("Doc", doc_index[i])
             print(content)
