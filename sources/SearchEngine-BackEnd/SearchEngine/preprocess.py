@@ -13,8 +13,9 @@ import sys
 
 cutter = thulac.thulac(seg_only=True, filt=True)
 
-# dir = "../../../../" # change it for data file path
-dir = 'E:\\Tsinghua\\2020_spring\\SearchEngine\\Project\\' # 使用绝对路径
+# dir = "../../../" # change it for data file path
+dir = "D:\\Stupid-Legal-Search\\dataset\\"
+# dir = 'E:\\Tsinghua\\2020_spring\\SearchEngine\\Project\\' # 使用绝对路径
 base_path = [dir + item for item in ["xml_1", "xml_2", "xml_3", "xml_4"]]
 
 
@@ -89,7 +90,7 @@ def trim_and_cut(text):
 
 
 def parse_paper(file_path, pid):
-    label_elements = ['AJLB', 'SPCX', 'WSZL', 'CPSJ', 'XZQH_P', 'XZQH_C', 'XZQH_CC', 'JBFY', 'FGRYWZ']
+    label_elements = ['AJLB', 'SPCX', 'WSZL', 'CPSJ', 'XZQH_P', 'XZQH_C', 'XZQH_CC', 'JBFY', 'FGRYWZ', 'JAND']
     paper_dict = {}
     try:
         root = parse(file_path).documentElement
@@ -158,7 +159,6 @@ def construct_inverted_index(db, doc_length, inverted_index_dict, appear_list):
     avg_doc_len = np.average(doc_length)
     total_doc = len(doc_length)
     appear_cnt = 0
-
     with tqdm(total=len(inverted_index_dict.keys()), desc="Constructing Inverted Index") as pbar:
         for term, appear_id_list in inverted_index_dict.items():
             inverted_index = {'term': term, 'appear_list': []}
@@ -178,9 +178,9 @@ def construct_inverted_index(db, doc_length, inverted_index_dict, appear_list):
 
 if __name__ == "__main__":
     doc_files = read_all_doc_files(base_path)
-    shuffle(doc_files)
+    # shuffle(doc_files)
     doc_files = [item for item in doc_files]
-    doc_files = doc_files[:5000]
+    doc_files = doc_files[:100]
     print('#File: ' + str(len(doc_files)))
 
     client = pymongo.MongoClient(host="localhost", port=27017)
