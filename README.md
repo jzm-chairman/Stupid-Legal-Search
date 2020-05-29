@@ -74,20 +74,6 @@ temp/filename.pkl
 [name1, name2, ...]
 ```
 
-## 简单服务器
-
-首先将preprocess的结果导入MongoDB，在MongoDB的`bin/`目录下运行：
-
-```bash
-mongoimport --db SearchEngine --collection InvertedIndex --file sources/temp/inverted_index.json --jsonArray
-```
-
-接着在`sources/SearchEngine`启动服务器：
-
-```bash
-python manage.py runserver
-```
-
 ## 前端使用
 
 在`source/SearchEngine-FrontEnd`下运行
