@@ -136,11 +136,13 @@ def get_best_word(node):
 
 
 def get_recommended_words(prefix):
-    node = collection_trie.find_one()
+    if prefix == '':
+        return []
+    node = collection_trie.find_one({'char': prefix[0]})
     if node is None:
         return []
     print('prefix: {}'.format(prefix))
-    for c in list(prefix):
+    for c in list(prefix[1:]):
         find = False
         for child_dict in node['children']:
             if child_dict['char'] == c:

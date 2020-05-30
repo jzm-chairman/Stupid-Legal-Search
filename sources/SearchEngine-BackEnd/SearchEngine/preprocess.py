@@ -225,16 +225,18 @@ def build_trie(db, score_dict):
     for inverted_index in inverted_index_list:
         word_list += [inverted_index['term']]
     word_list = sorted(word_list)
+    print('word size: {}'.format(len(word_list)))
     for word in word_list[:100]:
         print('word: {}, score: {}'.format(word, score_dict[word]))
     root = {'at': 0, 'cnt': 0, 'score': 0, 'max_score': 0, 'children': []}
     for word in word_list:
         insert_word_to_trie(root, word, score_dict[word])
     root = sort_children(root)
+    print('root degree: {}'.format(len(root['children'])))
 
     collection_trie = db['Trie']
     # print(root)
-    collection_trie.insert_one(root)
+    collection_trie.insert_many(root['children'])
 
 
 if __name__ == "__main__":
@@ -242,7 +244,7 @@ if __name__ == "__main__":
     doc_files = read_all_doc_files(base_path)
     # shuffle(doc_files)
     doc_files = [item for item in doc_files]
-    doc_files = doc_files[:10]
+    doc_files = doc_files[:10000]
     print('#File: ' + str(len(doc_files)))
 
     client = pymongo.MongoClient(host="localhost", port=27017)
