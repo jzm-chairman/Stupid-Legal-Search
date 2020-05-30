@@ -14,8 +14,8 @@ import sys
 cutter = thulac.thulac(seg_only=True, filt=True)
 
 # dir = "../../../" # change it for data file path
-dir = "D:\\Stupid-Legal-Search\\dataset\\"
-# dir = 'E:\\Tsinghua\\2020_spring\\SearchEngine\\Project\\' # 使用绝对路径
+# dir = "D:\\Stupid-Legal-Search\\dataset\\"
+dir = 'E:\\Tsinghua\\2020_spring\\SearchEngine\\Project\\' # 使用绝对路径
 base_path = [dir + item for item in ["xml_1", "xml_2", "xml_3", "xml_4"]]
 
 
@@ -156,16 +156,19 @@ def extract_appearance_and_labels(db, doc_files):
 def construct_inverted_index(db, doc_length, inverted_index_dict, appear_list):
     collection_inverted_index = db['InvertedIndex']
     wait_list = []
+    score_dict = {}
     avg_doc_len = np.average(doc_length)
     total_doc = len(doc_length)
     appear_cnt = 0
     with tqdm(total=len(inverted_index_dict.keys()), desc="Constructing Inverted Index") as pbar:
         for term, appear_id_list in inverted_index_dict.items():
             inverted_index = {'term': term, 'appear_list': []}
+            score_dict[term] = 0
             for aid in appear_id_list:
                 appear = appear_list[aid]
                 score = get_BM25(appear['freq'], doc_length[appear['pid']], avg_doc_len, total_doc, len(appear_id_list))
                 appear['score'] = score
+                score_dict[term] += score
                 inverted_index['appear_list'].append(appear)
                 appear_cnt += 1
             wait_list.append(inverted_index)
@@ -174,6 +177,51 @@ def construct_inverted_index(db, doc_length, inverted_index_dict, appear_list):
                 collection_inverted_index.insert_many(wait_list)
                 wait_list = []
             pbar.update(1)
+    return score_dict
+
+
+def insert_word_to_trie(node, word, score=1):
+    if len(word) > 0:
+        c = word[0]
+        child_list = node['children']
+        if len(child_list) == 0 or child_list[-1]['char'] != c:
+            new_node = {'char': c, 'at': 0, 'cnt': 1, 'score': 0, 'max_score': score, 'children': []}
+            child_list += [new_node]
+        else:
+            child_list[-1]['max_score'] = max(score, child_list[-1]['max_score'])
+            child_list[-1]['cnt'] += 1
+        insert_word_to_trie(child_list[-1], word[1:], score)
+        node['children'] = child_list
+    else:
+        node['at'] += 1
+        node['score'] = score
+
+
+def sort_children(node):
+    new_list = []
+    for child_dict in node['children']:
+        new_list += [sort_children(child_dict)]
+    node['children'] = sorted(new_list, key=(lambda d: d['max_score']), reverse=True)
+    return node
+
+
+def build_trie(db, score_dict):
+    collection_inverted_index = db['InvertedIndex']
+    inverted_index_list = collection_inverted_index.find()
+    word_list = []
+    for inverted_index in inverted_index_list:
+        word_list += [inverted_index['term']]
+    word_list = sorted(word_list)
+    for word in word_list[:100]:
+        print('word: {}, score: {}'.format(word, score_dict[word]))
+    root = {'at': 0, 'cnt': 0, 'score': 0, 'max_score': 0, 'children': []}
+    for word in word_list:
+        insert_word_to_trie(root, word, score_dict[word])
+    root = sort_children(root)
+
+    collection_trie = db['Trie']
+    # print(root)
+    collection_trie.insert_one(root)
 
 
 if __name__ == "__main__":
@@ -186,6 +234,6 @@ if __name__ == "__main__":
     client = pymongo.MongoClient(host="localhost", port=27017)
     db = client['SearchEngine']
 
-    # extract_paper_labels(db, doc_files)
     doc_length, inverted_index_dict, appear_list = extract_appearance_and_labels(db, doc_files)
-    construct_inverted_index(db, doc_length, inverted_index_dict, appear_list)
+    score_dict = construct_inverted_index(db, doc_length, inverted_index_dict, appear_list)
+    build_trie(db, score_dict)

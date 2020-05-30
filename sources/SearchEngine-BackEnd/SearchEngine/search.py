@@ -15,6 +15,7 @@ client = pymongo.MongoClient(host="localhost", port=27017)
 db = client['SearchEngine']
 collection_paper = db['Paper']
 collection_inverted_index = db['InvertedIndex']
+collection_trie = db['Trie']
 # need_stats_keys = ["案件类别", "审判程序", "文书种类", "行政区划(省)", "结案年度"]
 need_stats_keys = ["AJLB", "SPCX", "WSZL", "XZQH_P", "JAND"]
 
@@ -26,7 +27,7 @@ document_cache = LRUCache(maxsize=MAX_CACHE_SIZE)
 # doc_files = [root_dir + file for file in pickle.loads(open(doc_files_store, "rb").read()]
 cn_to_key = {'案件类别': 'AJLB', '审判程序': 'SPCX', '文书种类': 'WSZL', '行政区划(省)': 'XZQH_P', '结案年度': 'JAND',
              '裁判时间': 'CPSJ', '行政区划(市)': 'XZQH_C', '行政区划(区县)': 'XZQH_CC',
-             '经办法院': 'JBFY', 'FGRYWZ': '法官人员完整', '文首': 'WS'}
+             '经办法院': 'JBFY', '法官人员完整': 'FGRYWZ', '文首': 'WS'}
 key_to_cn = {value : key for key, value in cn_to_key.items()}
 
 def get_inverted_index(term):
@@ -102,6 +103,56 @@ def get_meta_info(pid_list):
     rets["results"] = results
     rets["statistics"] = statistics
     return rets
+
+
+def get_best_word(node):
+    def update_score(node):
+        node['max_score'] = 0 if node['at'] == 0 else node['score']
+        for child in node['children']:
+            if child['cnt'] > 0:
+                node['max_score'] = max(node['max_score'], child['max_score'])
+    res = None
+    if node['at'] > 0 and node['score'] == node['max_score']:
+        node['at'] -= 1
+        res = ''
+    else:
+        for child in node['children']:
+            print('traverse ch: {}, score: {}'.format(child['char'], child['max_score']))
+            if child['cnt'] > 0 and child['max_score'] == node['max_score']:
+                print('enter ch: {}'.format(child['char']))
+                print('before: ', child)
+                res = child['char'] + get_best_word(child)
+                print('after: ', child)
+                break
+    if res is not None:
+        node['cnt'] -= 1
+        update_score(node)
+    return res
+
+
+def get_recommended_words(prefix):
+    node = collection_trie.find_one()
+    if node is None:
+        return []
+    print('prefix: {}'.format(prefix))
+    for c in list(prefix):
+        find = False
+        for child_dict in node['children']:
+            if child_dict['char'] == c:
+                find = True
+                node = child_dict
+                break
+        if not find:
+            return []
+    rec_len = 5
+    rec_list = []
+    for i in range(rec_len):
+        word = get_best_word(node)
+        if word is None:
+            break
+        rec_list += [prefix + word]
+    return rec_list
+
 
 SUMMARY_CHARS = 100
 

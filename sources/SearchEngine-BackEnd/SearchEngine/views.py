@@ -64,3 +64,9 @@ def detail(request):
     doc_content = get_single_detail(index)
     doc_content["searchcut"] = list(keywords)
     return response(json.dumps(doc_content, ensure_ascii=False))
+
+
+def recommend(request):
+    prefix = request.GET.get("prefix")
+    res_list = get_recommended_words(prefix)
+    return response(json.dumps({'result': res_list}, ensure_ascii=False))
