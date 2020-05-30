@@ -15,8 +15,8 @@ import time
 cutter = thulac.thulac(seg_only=True, filt=True)
 
 # dir = "../../../" # change it for data file path
-# dir = "D:\\Stupid-Legal-Search\\dataset\\"
-dir = 'E:\\Tsinghua\\2020_spring\\SearchEngine\\Project\\' # 使用绝对路径
+dir = "D:\\Stupid-Legal-Search\\dataset\\"
+# dir = 'E:\\Tsinghua\\2020_spring\\SearchEngine\\Project\\' # 使用绝对路径
 base_path = [dir + item for item in ["xml_1", "xml_2", "xml_3", "xml_4"]]
 
 
@@ -225,9 +225,8 @@ def build_trie(db, score_dict):
     for inverted_index in inverted_index_list:
         word_list += [inverted_index['term']]
     word_list = sorted(word_list)
-    print('word size: {}'.format(len(word_list)))
-    for word in word_list[:100]:
-        print('word: {}, score: {}'.format(word, score_dict[word]))
+    # for word in word_list[:100]:
+    #     print('word: {}, score: {}'.format(word, score_dict[word]))
     root = {'at': 0, 'cnt': 0, 'score': 0, 'max_score': 0, 'children': []}
     for word in word_list:
         insert_word_to_trie(root, word, score_dict[word])

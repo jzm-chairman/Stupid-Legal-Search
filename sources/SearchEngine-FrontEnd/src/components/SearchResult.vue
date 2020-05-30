@@ -28,9 +28,14 @@
         </div>
         <div class="right">
             <div class="searchbox">
-                <el-input v-model="filters.searchkey">
+                <el-autocomplete style="width:100%"
+                  v-model="filters.searchkey"
+                  @keyup.enter.native="search"
+                  :trigger-on-focus="false"
+                  :fetch-suggestions="prompt"
+                  @select="handle_select">
                     <el-button type="primary" @click="search" slot="append">搜索</el-button>
-                </el-input>
+                </el-autocomplete>
             </div>
             <div class="search-result">
                 <template v-for="item in searchresult">
@@ -73,6 +78,7 @@ export default {
       filters: {
         searchkey: ''
       },
+      prompt_list: [],
       searchkeycut: '',
       total: 0,
       pageindex: 1,
@@ -90,7 +96,7 @@ export default {
       var params = JSON.parse(JSON.stringify(this.filters))
       params.pageindex = this.pageindex
       params.pagesize = this.pagesize
-      GET('/search/', params).then(response => {
+      GET('/search', params).then(response => {
         this.searchresult = response.results
         this.statistics = response.statistics
         this.total = response.total
@@ -136,6 +142,19 @@ export default {
         summary = replaceAll(summary, word, '<span style="color:red">' + word + '</span>')
       }
       return summary
+    },
+    prompt (input, callback) {
+      GET('/recommend', { prefix: input }).then(response => {
+        this.prompt_list = []
+        for (var i in response.result) {
+          this.prompt_list.push({value: response.result[i]})
+        }
+        callback(this.prompt_list)
+        console.log(this.prompt_list)
+      })
+    },
+    handle_select (item) {
+      this.search()
     }
   }
 }

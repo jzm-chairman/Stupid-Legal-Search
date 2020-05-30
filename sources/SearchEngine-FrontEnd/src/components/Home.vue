@@ -1,14 +1,20 @@
 <template>
     <div class="wrap">
         <div class="searchbox">
-            <el-input v-model="searchkey">
-                <el-button type="primary" @click="link" slot="append">搜索</el-button>
-            </el-input>
+            <el-autocomplete style="width:100%"
+            v-model="searchkey"
+            @keyup.enter.native="link"
+            :trigger-on-focus="false"
+            :fetch-suggestions="prompt"
+            >
+              <el-button type="primary" @click="link" slot="append">搜索</el-button>
+            </el-autocomplete>
         </div>
     </div>
 </template>
 
 <script>
+import { GET } from '../api/index'
 export default {
   name: 'home',
   data () {
@@ -19,6 +25,15 @@ export default {
   methods: {
     link () {
       this.$router.push({path: '/result', query: {searchkey: this.searchkey}})
+    },
+    prompt (input, callback) {
+      GET('/recommend', { prefix: input }).then(response => {
+        this.prompt_list = []
+        for (var i in response.result) {
+          this.prompt_list.push({value: response.result[i]})
+        }
+        callback(this.prompt_list)
+      })
     }
   }
 }

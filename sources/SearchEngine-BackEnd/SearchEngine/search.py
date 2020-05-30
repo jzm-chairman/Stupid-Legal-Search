@@ -31,9 +31,15 @@ cn_to_key = {'案件类别': 'AJLB', '审判程序': 'SPCX', '文书种类': 'WS
              '经办法院': 'JBFY', '法官人员完整': 'FGRYWZ', '文首': 'WS', '法律法条分组': 'FLFTFZ'}
 key_to_cn = {value : key for key, value in cn_to_key.items()}
 
+# inverted_index_all = {item["term"] : {"appear_list": item["appear_list"]} for item in collection_inverted_index.find()}
+# print("Inverted Index Size:", len(inverted_index_all))
+
 def get_inverted_index(term):
     return collection_inverted_index.find_one({'term': term})
-
+    # try:
+    #     return inverted_index_all[term]
+    # except KeyError as e:
+    #     return None
 
 def get_paper_info(pid):
     return collection_paper.find_one({'pid': pid})
