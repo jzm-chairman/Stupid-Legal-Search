@@ -47,8 +47,8 @@ def search(request):
     print("Get Meta Info Time: {}s".format(time.time() - start))
     print("Page Size = {}, Page Index = {}".format(page_size, page_index))
     print("Summary Cache Size = {}, Document Cache Size = {}".format(len(summary_cache), len(document_cache)))
-    fill_in_summary(doc_content["results"], query_words)
     start = time.time()
+    fill_in_summary(doc_content["results"], query_words)
     print("Summarize Time: {}s".format(time.time() - start))
     doc_content["query_words"] = query_words
     return response(json.dumps(doc_content, ensure_ascii=False))

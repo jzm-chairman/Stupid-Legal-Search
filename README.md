@@ -8,11 +8,15 @@
 + 搜索结果的可调分页展示
 + 含关键词高亮的文书摘要和文书详情展示
 + 简单的标签筛选搜索
+<<<<<<< HEAD
 + 基于Trie的引导词提示
+=======
++ 十分垃圾的同法官案件推荐和同法律案件推荐
+>>>>>>> c57a6fb24f62508b965a0f9be5be22bfd7691ec4
 
 ### 可能需要解决的问题
 
-+ 冷启动速度过于缓慢
++ ~~冷启动速度过于缓慢~~
 + 前端排版过于丑陋
 + 类似案件搜索没有想法
 + 搜索词引导可能实现困难
@@ -23,13 +27,14 @@ Ranker Version2：在倒排索引中增加字段“score”记录每个查询词
 
 详情：https://my.oschina.net/stanleysun/blog/1617727
 
-### 第一个原型
+### 后端使用
 
-最简单的原型用法：
+在`source/SearchEngine-BackEnd/SearchEngine`目录下依次运行
 
-```
-python preprocess.py 生成文件列表和倒排索引(暂时只用100篇)
-python search.py 输入关键词搜索
+```shell
+python preprocess.py # 数据集预处理+数据库构建
+cd ..
+python manage.py runserver # 启动后端服务器
 ```
 
 数据库结构：
@@ -61,6 +66,8 @@ Paper(16w)
 	'XZQH_CC': (string), # 行政区划（区县）
 	'JBFY': (string), # 经办法院
 	'FGRYWZ ': (list) # 法官成员完整
+	'WS': (string) # 文首
+	'FLFTFZ': (list) # 法律法条分组
 }
 ```
 
@@ -71,25 +78,7 @@ temp/filename.pkl
 [name1, name2, ...]
 ```
 
-## 简单服务器
-
-首先将preprocess的结果导入MongoDB，在MongoDB的`bin/`目录下运行：
-
-```bash
-mongoimport --db SearchEngine --collection InvertedIndex --file sources/temp/inverted_index.json --jsonArray
-```
-
-接着在`sources/SearchEngine`启动服务器：
-
-```bash
-python manage.py runserver
-```
-
-## 有前端了
-
-先确定文件列表和倒排索引的位置在`temp/`
-
-在`source/SearchEngine`下运行`manage.py`启动服务器
+## 前端使用
 
 在`source/SearchEngine-FrontEnd`下运行
 

@@ -13,10 +13,30 @@
         <el-divider></el-divider>
         <div class="content">
             <template v-for="key in showkeys">
-                <div v-bind:key="key" v-if="key in detail">
+                <div v-bind:key="key" v-if="key in detail && detail[key]">
                     <div class="subtitle" v-html="key"></div>
                     <div class="detail" v-html="detail[key]"></div>
                 </div>
+            </template>
+            <el-divider></el-divider>
+            案件推荐:若符合条件案件数多于10个则随机选取10个
+            <p></p>
+            <template v-for="(key, i) in recomkeys">
+              <div v-bind:key="i">
+                <div class="subtitle2" v-html="key"></div>
+                <template v-for="(name, j) in detail[recomkeys_ext[i]]">
+                  <div v-bind:key="j">
+                    <div class="detail-bold" v-html="name" v-if="detail[recomkeys[i]][j].length > 0"></div>
+                    <div>
+                      <template v-for="(item, k) in detail[recomkeys[i]][j]">
+                        <div v-bind:key="k">
+                          <a v-bind:href="jump_url(item.pid)" target="_blank">{{ item.WS }}</a>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </template>
+              </div>
             </template>
         </div>
     </div>
@@ -31,6 +51,8 @@ export default {
     return {
       detail: null,
       showkeys: ['当事人', '当事人段', '诉讼记录', '案件基本情况', '案件基本情况段', '案件事实段', '裁判分析过程', '起诉分析段', '判决结果', '本审判决结果', '文尾'],
+      recomkeys: ['同法官案件推荐', '同法律案件推荐'],
+      recomkeys_ext: ['法官人员完整', '法律法条分组'],
       searchcut: ''
     }
   },
@@ -59,6 +81,9 @@ export default {
         value = replaceAll(value, word, '<span style="color:red">' + word + '</span>')
       }
       return value
+    },
+    jump_url (index) {
+      return 'detail?index=' + String(index)
     }
   }
 }
@@ -80,9 +105,20 @@ export default {
   font-size: 24px;
   font-weight: bold;
 }
+.subtitle2 {
+  border-left: 10px solid #ff4500;
+  padding-left: 20px;
+  font-size: 24px;
+  font-weight: bold;
+}
 .detail {
   padding-bottom: 20px;
   padding-top: 20px;
+}
+.detail-bold {
+  padding-bottom: 20px;
+  padding-top: 20px;
+  font-weight: bold;
 }
 .realtitle {
   font-size: 32px;

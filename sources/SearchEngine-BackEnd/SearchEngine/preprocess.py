@@ -1,6 +1,6 @@
 import os
 import re
-from xml.dom.minidom import parse
+from xml.dom.minidom import parse, Element
 import pickle
 from tqdm import tqdm
 import thulac
@@ -10,6 +10,7 @@ from collections import defaultdict
 import numpy as np
 import pymongo
 import sys
+import time
 
 cutter = thulac.thulac(seg_only=True, filt=True)
 
@@ -111,6 +112,18 @@ def parse_paper(file_path, pid):
                 paper_dict[label] = root.getElementsByTagName(label)[0].getAttribute("value")
         except Exception:
             paper_dict[label] = ''
+    laws = set()
+    for law_node in root.getElementsByTagName("FLFTFZ"):
+        law_mc, law_t = "", ""
+        for child in law_node.childNodes:
+            if child.nodeName == "MC":
+                law_mc = child.getAttribute("value")
+            elif child.nodeName == "T":
+                law_t = child.getAttribute("value")
+        if law_mc:
+            laws.add("{}_{}".format(law_mc, law_t))
+    # print(laws)
+    paper_dict["FLFTFZ"] = list(laws)
     return full_text, paper_dict
 
 
@@ -225,10 +238,11 @@ def build_trie(db, score_dict):
 
 
 if __name__ == "__main__":
+    start = time.time()
     doc_files = read_all_doc_files(base_path)
     # shuffle(doc_files)
     doc_files = [item for item in doc_files]
-    doc_files = doc_files[:10000]
+    doc_files = doc_files[:10]
     print('#File: ' + str(len(doc_files)))
 
     client = pymongo.MongoClient(host="localhost", port=27017)
@@ -237,3 +251,4 @@ if __name__ == "__main__":
     doc_length, inverted_index_dict, appear_list = extract_appearance_and_labels(db, doc_files)
     score_dict = construct_inverted_index(db, doc_length, inverted_index_dict, appear_list)
     build_trie(db, score_dict)
+    print("Total Elapsed Time: {}s".format(time.time() - start))

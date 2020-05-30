@@ -6,6 +6,7 @@ from xml.dom.minidom import parse
 from cachetools import LRUCache
 import numpy as np
 import pymongo
+import random
 
 root_dir = "../../../"
 doc_files_store = root_dir + "temp/filename.pkl"
@@ -27,7 +28,7 @@ document_cache = LRUCache(maxsize=MAX_CACHE_SIZE)
 # doc_files = [root_dir + file for file in pickle.loads(open(doc_files_store, "rb").read()]
 cn_to_key = {'案件类别': 'AJLB', '审判程序': 'SPCX', '文书种类': 'WSZL', '行政区划(省)': 'XZQH_P', '结案年度': 'JAND',
              '裁判时间': 'CPSJ', '行政区划(市)': 'XZQH_C', '行政区划(区县)': 'XZQH_CC',
-             '经办法院': 'JBFY', '法官人员完整': 'FGRYWZ', '文首': 'WS'}
+             '经办法院': 'JBFY', '法官人员完整': 'FGRYWZ', '文首': 'WS', '法律法条分组': 'FLFTFZ'}
 key_to_cn = {value : key for key, value in cn_to_key.items()}
 
 def get_inverted_index(term):
@@ -37,16 +38,16 @@ def get_inverted_index(term):
 def get_paper_info(pid):
     return collection_paper.find_one({'pid': pid})
 
-def query_by_condition(doc_list, condition):
+def query_by_condition(condition, doc_list=None):
     cond = {cn_to_key[key] : value for key, value in condition.items()}
-    cond_index = {"pid": {"$in": doc_list}}
-    return collection_paper.find({**cond_index, **cond}, {"_id": 0, "pid": 1})
+    cond_index = {"pid": {"$in": doc_list}} if doc_list is not None else {}
+    return collection_paper.find({**cond_index, **cond}, {"_id": 0, "pid": 1, "WS": 1})
     # return collection_paper.find(cond, {"_id": 0, "pid": 1})
 
 def filters(doc_recall, condition):
     if not condition:
         return doc_recall
-    cursor = query_by_condition(doc_recall, condition)
+    cursor = query_by_condition(condition, doc_recall)
     # ret = list(set(doc_recall) & {item["pid"] for item in cursor})
     ret = [item["pid"] for item in cursor]
     print(len(ret))
@@ -82,7 +83,7 @@ def rank(doc_recall, words):
 
 def get_meta_info(pid_list):
     # 根据索引获取文档内容
-    normal_keys = ["WS", "CPSJ", "AJLB", "SPCX", "WSZL", "XZQH_P", "JAND"]
+    normal_keys = ["WS", "CPSJ", "AJLB", "SPCX", "WSZL", "XZQH_P", "JAND", "FLFTFZ", "FGRYWZ"]
     # 文首，裁判时间，案件类别，审判程序，文书种类，行政区划(省)，结案年度
     rets = {}
     results = []
@@ -99,7 +100,11 @@ def get_meta_info(pid_list):
             key = key_to_cn[key]
             if key not in item or not item[key]:
                 continue
-            statistics[key][item[key]] = 1 if item[key] not in statistics[key] else statistics[key][item[key]] + 1
+            if isinstance(item[key], list):
+                for subitem in item[key]:
+                    statistics[key][subitem] = 1 if subitem not in statistics[key] else statistics[key][subitem] + 1
+            else:
+                statistics[key][item[key]] = 1 if item[key] not in statistics[key] else statistics[key][item[key]] + 1
     rets["results"] = results
     rets["statistics"] = statistics
     return rets
@@ -186,6 +191,7 @@ def fill_in_summary(results, keywords):
         slice_start = max(0, slice_start - max(0, int((SUMMARY_CHARS - (slice_end - slice_start)) / 2)))
         result["摘要"] = ("..." if slice_start > 0 else "") + full_text[slice_start:slice_start+SUMMARY_CHARS] + ("..." if slice_start + SUMMARY_CHARS < len(full_text) else "")
 
+MAX_RECOMMENDATION = 10
 
 def get_single_detail(doc):
     if doc in document_cache:
@@ -193,7 +199,7 @@ def get_single_detail(doc):
     root = parse(get_paper_info(doc)['path']).documentElement
     keys = ["QW", "WS", "JBFY", "AH", "CPSJ", "DSR", "DSRD", "SSJL", "AJJBQK", "AJJBQKD", "AJSSD", "CPFXGC", "QSFXD", "PJJG", "BSPJJG", "WW", "AJLB", "SPCX", "WSZL", "XZQH_P", "JAND"]
     # 全文，文首，经办法院，案号，裁判时间，当事人，当事人段，诉讼记录，案件基本情况，案件基本情况段，案件事实段，裁判分析过程，起诉分析段，判决结果，本审判决结果，文尾，案件类别，审判程序，文书种类，行政区划(省)，结案年度
-    escape_keys = {"AJLB", "SPCX", "WSZL", "XZQH_P", "JAND"}  # 不需要加格式的字段
+    # escape_keys = {"AJLB", "SPCX", "WSZL", "XZQH_P", "JAND"}  # 不需要加格式的字段
     item = {}
     item["filename"] = get_paper_info(doc)['path']
     for xml_key in keys:
@@ -203,6 +209,18 @@ def get_single_detail(doc):
         key_cn = elems[0].getAttribute("nameCN")
         value = elems[0].getAttribute("value")
         item[key_cn] = value
+    if doc not in summary_cache:
+        get_meta_info([doc])
+    keys_from_db = ["法官人员完整", "法律法条分组"]
+    keys_to_frontend = ["同法官案件推荐", "同法律案件推荐"]
+    item = {**item, **{key : summary_cache[doc][key] for key in keys_from_db}, **{_: [] for _ in keys_to_frontend}}
+    for i in range(len(keys_from_db)):
+        key_name = keys_from_db[i]
+        for value in item[key_name]:
+            cases = [case for case in query_by_condition({key_name: value}) if case["pid"] != doc]
+            if len(cases) > MAX_RECOMMENDATION:
+                random.shuffle(cases)
+            item[keys_to_frontend[i]].append(cases[:MAX_RECOMMENDATION])
     document_cache[doc] = item
     return item
 
