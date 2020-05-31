@@ -91,7 +91,7 @@ def trim_and_cut(text):
 
 
 def parse_paper(file_path, pid):
-    label_elements = ['AJLB', 'SPCX', 'WSZL', 'CPSJ', 'JAND', 'XZQH_P', 'XZQH_C', 'XZQH_CC', 'JBFY', 'FGRYWZ', 'WS']
+    label_elements = ['AJLB', 'SPCX', 'WSZL', 'CPSJ', 'JAND', 'XZQH_P', 'XZQH_C', 'XZQH_CC', 'JBFY', 'FGRYWZ', 'WS', 'LB', 'title']
     paper_dict = {}
     try:
         root = parse(file_path).documentElement
@@ -105,13 +105,21 @@ def parse_paper(file_path, pid):
     paper_dict['path'] = file_path
     paper_dict['pid'] = pid
     for label in label_elements:
-        try:
-            if label == 'FGRYWZ':
-                paper_dict[label] = [x.getAttribute("value") for x in root.getElementsByTagName(label)]
-            else:
-                paper_dict[label] = root.getElementsByTagName(label)[0].getAttribute("value")
-        except Exception:
-            paper_dict[label] = ''
+        if label == 'FGRYWZ':
+            paper_dict[label] = [x.getAttribute("value") for x in root.getElementsByTagName(label)]
+        else:
+            elems = root.getElementsByTagName(label)
+            paper_dict[label] = ""
+            if len(elems) == 0:
+                continue
+            for elem in elems:
+                if elem.hasAttribute("value"):
+                    paper_dict[label] = elem.getAttribute("value")
+                    break
+    if not paper_dict["LB"]:
+        paper_dict["LB"] = "普通案例"
+    if not paper_dict["title"]:
+        paper_dict["title"] = paper_dict["WS"]
     laws = set()
     for law_node in root.getElementsByTagName("FLFTFZ"):
         law_mc, law_t = "", ""
@@ -132,7 +140,8 @@ def extract_appearance_and_labels(db, doc_files):
     appear_list = []
     paper_list = []
     inverted_index_dict = defaultdict(list)
-    doc_length = np.zeros(len(doc_files)) # 记录文档长度(BM25用)
+    # doc_length = np.zeros(len(doc_files)) # 记录文档长度(BM25用)
+    doc_length = []
     offset_size = 0
     global appear_num
     appear_num = 0
@@ -143,16 +152,18 @@ def extract_appearance_and_labels(db, doc_files):
             if full_text is None:
                 pbar.update(1)
                 continue
-            paper_num += 1
             paper_list.append(paper_dict)
             seg_list = trim_and_cut(full_text)
             full_text_list = []
             for seg_text in seg_list:
                 full_text_list += cutter.cut(seg_text)
-            doc_length[i] = len(full_text_list)
+            # doc_length[i] = len(full_text_list)
+            doc_length.append(len(full_text_list))
             offset_size += len(full_text_list)
 
-            update_inverted_index(full_text_list, i, inverted_index_dict, appear_list)
+            # update_inverted_index(full_text_list, i, inverted_index_dict, appear_list)
+            update_inverted_index(full_text_list, paper_num, inverted_index_dict, appear_list)
+            paper_num += 1
             if len(paper_list) > 10000 or pbar.n + 1 == pbar.total:
                 print("insert_many Paper")
                 collection_paper.insert_many(paper_list)
@@ -163,6 +174,7 @@ def extract_appearance_and_labels(db, doc_files):
                 print("term_num: " + str(len(inverted_index_dict.keys())))
                 print("paper_num: " + str(paper_num))
             pbar.update(1)
+    doc_length = np.array(doc_length)
     return doc_length, inverted_index_dict, appear_list
 
 
@@ -241,13 +253,14 @@ def build_trie(db, score_dict):
 if __name__ == "__main__":
     start = time.time()
     doc_files = read_all_doc_files(base_path)
-    # shuffle(doc_files)
+    shuffle(doc_files)
     doc_files = [item for item in doc_files]
     doc_files = doc_files[:10000]
     print('#File: ' + str(len(doc_files)))
 
     client = pymongo.MongoClient(host="localhost", port=27017)
     db = client['SearchEngine']
+    # db = client["SearchTest"]
 
     doc_length, inverted_index_dict, appear_list = extract_appearance_and_labels(db, doc_files)
     score_dict = construct_inverted_index(db, doc_length, inverted_index_dict, appear_list)

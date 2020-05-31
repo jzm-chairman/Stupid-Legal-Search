@@ -33,7 +33,7 @@ def search(request):
     print("Filter Time: {}s".format(time.time() - start))
     print("Recall & Filter Size:", len(doc_filter))
     start = time.time()
-    doc_rank = rank(doc_filter, query_words)
+    doc_rank = rank(doc_filter, query_words, (query, condition))
     print("Rank Time: {}s".format(time.time() - start))
     # print(doc_rank)
     start = time.time()

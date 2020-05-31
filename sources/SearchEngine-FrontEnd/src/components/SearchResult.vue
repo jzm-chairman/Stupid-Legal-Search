@@ -41,9 +41,15 @@
                 <template v-for="item in searchresult">
                     <div class="search-item" v-bind:key="item.index">
                       <div class="item-title">
-                        <a id="title" v-bind:key="item.index" v-bind:href="detail_url(item.index)" target="_blank" class="title">
-                            {{ item.文首 }}
-                        </a>
+                        <div v-if="item.案例类别=='普通案例'">
+                          <a id="title" v-bind:href="detail_url(item.index)" target="_blank" class="title" v-html="item.标题">
+                          </a>
+                        </div>
+                        <div v-else>
+                          <span class="item-prefix">{{ item.案例类别 }}</span>
+                          <a id="title" v-bind:href="detail_url(item.index)" target="_blank" class="title" v-html="item.标题">
+                          </a>
+                        </div>
                       </div>
                       <div class="item-summary" v-html="item.摘要"></div>
                     </div>
@@ -103,6 +109,7 @@ export default {
         this.searchkeycut = response.query_words
         for (var i in this.searchresult) {
           this.searchresult[i].摘要 = this.render(this.searchresult[i].摘要)
+          this.searchresult[i].标题 = this.render(this.searchresult[i].标题)
         }
       })
     },
@@ -196,13 +203,18 @@ export default {
 }
 .right {
   float: right;
-  padding: 0 100px 0 0;
+  padding-right: 100px;
   width: 60%;
 }
 .search-item {
   padding: 10px;
+  text-align: left;
 }
 .search-result {
   padding: 20px;
+}
+.item-prefix {
+  background-color: #ff8c00;
+  color: #ffffff;
 }
 </style>

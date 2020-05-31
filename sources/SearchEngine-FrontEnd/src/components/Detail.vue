@@ -1,7 +1,7 @@
 <template>
     <div class="page">
         <div class="title">
-            <div class="realtitle" v-html="detail.文首"></div>
+            <div class="realtitle" v-html="detail.标题"></div>
             <div>
                 <span v-html="detail.经办法院"></span>
                 <span>  |  </span>
@@ -12,32 +12,33 @@
         </div>
         <el-divider></el-divider>
         <div class="content">
-            <template v-for="key in showkeys">
+            <template v-for="key in (detail.案例类别=='普通案例' ? showkeys : showkeys_auth)">
                 <div v-bind:key="key" v-if="key in detail && detail[key]">
                     <div class="subtitle" v-html="key"></div>
                     <div class="detail" v-html="detail[key]"></div>
                 </div>
             </template>
             <el-divider></el-divider>
-            案件推荐:若符合条件案件数多于10个则随机选取10个
             <p></p>
-            <template v-for="(key, i) in recomkeys">
-              <div v-bind:key="i">
-                <div class="subtitle2" v-html="key"></div>
-                <template v-for="(name, j) in detail[recomkeys_ext[i]]">
-                  <div v-bind:key="j">
-                    <div class="detail-bold" v-html="name" v-if="detail[recomkeys[i]][j].length > 0"></div>
-                    <div>
-                      <template v-for="(item, k) in detail[recomkeys[i]][j]">
-                        <div v-bind:key="k">
-                          <a v-bind:href="jump_url(item.pid)" target="_blank">{{ item.WS }}</a>
-                        </div>
-                      </template>
+            <div v-if="detail.案例类别=='普通案例'">
+              <template v-for="(key, i) in recomkeys">
+                <div v-bind:key="i">
+                  <div class="subtitle2" v-html="key"></div>
+                  <template v-for="(name, j) in detail[recomkeys_ext[i]]">
+                    <div v-bind:key="j">
+                      <div class="detail-bold" v-html="name" v-if="detail[recomkeys[i]][j].length > 0"></div>
+                      <div>
+                        <template v-for="(item, k) in detail[recomkeys[i]][j]">
+                          <div v-bind:key="k">
+                            <a v-bind:href="jump_url(item.pid)" target="_blank">{{ item.WS }}</a>
+                          </div>
+                        </template>
+                      </div>
                     </div>
-                  </div>
-                </template>
-              </div>
-            </template>
+                  </template>
+                </div>
+              </template>
+            </div>
         </div>
     </div>
 </template>
@@ -51,6 +52,7 @@ export default {
     return {
       detail: null,
       showkeys: ['当事人', '当事人段', '诉讼记录', '案件基本情况', '案件基本情况段', '案件事实段', '裁判分析过程', '起诉分析段', '判决结果', '本审判决结果', '文尾'],
+      showkeys_auth: ['案例原则', '全文'],
       recomkeys: ['同法官案件推荐', '同法律案件推荐'],
       recomkeys_ext: ['法官人员完整', '法律法条分组'],
       searchcut: ''
@@ -67,6 +69,12 @@ export default {
         var key = this.showkeys[i]
         if (key in this.detail) {
           this.detail[key] = this.render(this.detail[key])
+        }
+      }
+      for (var j in this.showkeys_auth) {
+        var akey = this.showkeys_auth[j]
+        if (akey in this.detail) {
+          this.detail[akey] = this.render(this.detail[akey])
         }
       }
     })
