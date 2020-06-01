@@ -5,7 +5,7 @@ import pickle
 from tqdm import tqdm
 import thulac
 from random import shuffle
-from .utils import *
+from utils import *
 from collections import defaultdict
 import numpy as np
 import pymongo
@@ -14,8 +14,8 @@ import time
 cutter = thulac.thulac(seg_only=True, filt=True)
 
 # dir = "../../../" # change it for data file path
-dir = "D:\\Stupid-Legal-Search\\dataset\\"
-# dir = 'E:\\Tsinghua\\2020_spring\\SearchEngine\\Project\\' # 使用绝对路径
+# dir = "D:\\Stupid-Legal-Search\\dataset\\"
+dir = 'E:\\Tsinghua\\2020_spring\\SearchEngine\\Project\\' # 使用绝对路径
 base_path = [dir + item for item in ["xml_1", "xml_2", "xml_3", "xml_4"]]
 emb_file = dir + 'word_embedding\\sgns.renmin.word'
 
@@ -288,15 +288,15 @@ if __name__ == "__main__":
     start = time.time()
     doc_files = read_all_doc_files(base_path)
     shuffle(doc_files)
-    doc_files = doc_files[:20000]
+    doc_files = doc_files[:20]
     print('#File: ' + str(len(doc_files)))
 
     client = pymongo.MongoClient(host="localhost", port=27017)
     db = client['SearchEngine']
     # db = client["SearchTest"]
 
-    # doc_length, inverted_index_dict, appear_list = extract_appearance_and_labels(db, doc_files)
-    # score_dict = construct_inverted_index(db, doc_length, inverted_index_dict, appear_list)
-    # build_trie(db, score_dict)
+    doc_length, inverted_index_dict, appear_list = extract_appearance_and_labels(db, doc_files)
+    score_dict = construct_inverted_index(db, doc_length, inverted_index_dict, appear_list)
+    build_trie(db, score_dict)
     construct_doc_vec(db, doc_files, Embedding(emb_file))
     print("Total Elapsed Time: {}s".format(time.time() - start))

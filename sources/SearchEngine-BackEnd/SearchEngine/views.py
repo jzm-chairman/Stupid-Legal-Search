@@ -78,9 +78,20 @@ def recommend_docs(request):
     return response(json.dumps({'result': res_list}, ensure_ascii=False))
 
 
+def recommend_similar_docs(request):
+    pid = request.GET.get("pid")
+    res_list = get_similar_docs(pid)
+    return response(json.dumps({'result': res_list}, ensure_ascii=False))
+
+
 def test(request):
     text = get_single_detail(1)['全文']
     print('text: {}'.format(text))
     res_list = get_recommended_docs(text)
+    print(res_list)
+
+    pid = 3
+    print('pid: {}'.format(pid))
+    res_list = get_similar_docs(3)
     print(res_list)
     return response(json.dumps({'result': res_list}, ensure_ascii=False))

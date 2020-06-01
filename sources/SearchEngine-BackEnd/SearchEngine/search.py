@@ -313,6 +313,10 @@ def get_recommended_docs(text):
         word_doc_dict[inverted_index['term']] = len(inverted_index['appear_list'])
     print('word_doc_dict size: {}'.format(len(word_doc_dict.keys())))
     tgt_doc_vec = calc_doc_vec(word_times_dict, word_doc_dict, 10, doc_len, emb)
+    return get_similar_docs_by_vec(tgt_doc_vec)  # May contain -1
+
+
+def get_similar_docs_by_vec(tgt_doc_vec):
     min_dis = [1e9] * MAX_DOC_RECOMMENDATION
     res_pid = [-1] * MAX_DOC_RECOMMENDATION
 
@@ -331,8 +335,13 @@ def get_recommended_docs(text):
                 min_dis[i] = now_dis
                 res_pid[i] = doc_dict['pid']
                 break
-    return res_pid  # May contain -1
+    return res_pid
 
+
+def get_similar_docs(pid):
+    tgt_doc_vec = collection_doc_vec.find_one({'pid': pid})['vec']
+    return get_similar_docs_by_vec(tgt_doc_vec)
+    
 
 def main_loop():
     while True:

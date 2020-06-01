@@ -116,3 +116,13 @@ npm run dev
 }
 ```
 
+### 相似文书
+
+前端以`GET`方式访问`/similar_docs?pid=...`，`pid`为查询的文书id，返回`json`数据，格式如下：
+
+```
+{
+	'result': [pid, ...]
+}
+```
+

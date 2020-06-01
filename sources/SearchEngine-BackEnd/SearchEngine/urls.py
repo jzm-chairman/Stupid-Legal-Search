@@ -22,5 +22,6 @@ urlpatterns = [
     re_path(r'^detail/?$', views.detail),
     re_path(r'^recommend_words/?$', views.recommend_words),
     re_path(r'^recommend_docs/?$', views.recommend_docs),
+    re_path(r'^similar_docs/?$', views.recommend_similar_docs),
     re_path(r'^test/?$', views.test),
 ]

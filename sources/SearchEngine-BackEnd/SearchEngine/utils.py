@@ -43,8 +43,8 @@ class Embedding:
                         self.id_to_key += [word]
                         self.key_to_id[word] = cnt
                         self.id_to_emb += [list(map(lambda x: float(x), val_list[1: -1]))]
-                if i > 100:
-                    break
+                # if i > 100:
+                #     break
         self.cnt = cnt
         print("embedding load finishs, got %d words, cost %lf time" % (cnt, time.time() - begin_time))
 
