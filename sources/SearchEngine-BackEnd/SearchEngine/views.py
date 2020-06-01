@@ -66,7 +66,21 @@ def detail(request):
     return response(json.dumps(doc_content, ensure_ascii=False))
 
 
-def recommend(request):
+def recommend_words(request):
     prefix = request.GET.get("prefix")
     res_list = get_recommended_words(prefix)
+    return response(json.dumps({'result': res_list}, ensure_ascii=False))
+
+
+def recommend_docs(request):
+    text = request.GET.get("text")
+    res_list = get_recommended_docs(text)
+    return response(json.dumps({'result': res_list}, ensure_ascii=False))
+
+
+def test(request):
+    text = get_single_detail(1)['全文']
+    print('text: {}'.format(text))
+    res_list = get_recommended_docs(text)
+    print(res_list)
     return response(json.dumps({'result': res_list}, ensure_ascii=False))
