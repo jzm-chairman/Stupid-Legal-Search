@@ -15,9 +15,54 @@ import time
 cutter = thulac.thulac(seg_only=True, filt=True)
 
 # dir = "../../../" # change it for data file path
-dir = "D:\\Stupid-Legal-Search\\dataset\\"
-# dir = 'E:\\Tsinghua\\2020_spring\\SearchEngine\\Project\\' # 使用绝对路径
+# dir = "D:\\Stupid-Legal-Search\\dataset\\"
+dir = 'E:\\Tsinghua\\2020_spring\\SearchEngine\\Project\\' # 使用绝对路径
 base_path = [dir + item for item in ["xml_1", "xml_2", "xml_3", "xml_4"]]
+emb_file = dir + 'word_embedding\\sgns.renmin.word'
+
+
+def is_chinese_char(ch):
+    return '\u4e00' <= ch <= '\u9fff'
+
+
+def is_chinese_str(s):
+    for c in s:
+        if not is_chinese_char(c):
+            return False
+    return True
+
+
+class Embedding:
+    def __init__(self, file):
+        begin_time = time.time()
+        cnt = 0
+        self.unk_id = 0
+        # self.id_to_key = ['UNK']
+        # self.key_to_id = {'UNK': 0}
+        self.id_to_key = []
+        self.key_to_id = defaultdict(int)
+        self.id_to_emb = [[0] * 300]
+        with open(file, "r", encoding='utf8') as f:
+            for i, line in enumerate(f.readlines()):
+                val_list = line.split(' ')
+
+                if i == 0:
+                    self.dim = int(val_list[1])
+                else:
+                    word = val_list[0]
+                    if is_chinese_char(word):
+                        cnt += 1
+                        self.id_to_key += [word]
+                        self.key_to_id[word] = cnt
+                        self.id_to_emb += [list(map(lambda x: float(x), val_list[1: -1]))]
+                if i > 100:
+                    break
+        self.cnt = cnt
+        print("embedding load finishs, got %d words, cost %lf time" % (cnt, time.time() - begin_time))
+
+    def get_emb(self, word):
+        word = self.key_to_id[word]
+        return self.id_to_emb[word]
 
 
 def traverse(path, pattern, store):
@@ -95,12 +140,9 @@ def parse_paper(file_path, pid):
     paper_dict = {}
     try:
         root = parse(file_path).documentElement
-        full_text = root.getElementsByTagName("QW")
+        full_text = root.getElementsByTagName("QW")[0].getAttribute("value")
     except Exception:
         return None, None
-    if len(full_text) == 0:
-        return None, None
-    full_text = full_text[0].getAttribute("value")
 
     paper_dict['path'] = file_path
     paper_dict['pid'] = pid
@@ -153,7 +195,7 @@ def extract_appearance_and_labels(db, doc_files):
             offset_size += len(full_text_list)
 
             update_inverted_index(full_text_list, i, inverted_index_dict, appear_list)
-            if len(paper_list) > 10000 or pbar.n + 1 == pbar.total:
+            if len(paper_list) > 10000:
                 print("insert_many Paper")
                 collection_paper.insert_many(paper_list)
                 paper_list = []
@@ -163,6 +205,8 @@ def extract_appearance_and_labels(db, doc_files):
                 print("term_num: " + str(len(inverted_index_dict.keys())))
                 print("paper_num: " + str(paper_num))
             pbar.update(1)
+    if len(paper_list) > 0:
+        collection_paper.insert_many(paper_list)
     return doc_length, inverted_index_dict, appear_list
 
 
@@ -185,11 +229,13 @@ def construct_inverted_index(db, doc_length, inverted_index_dict, appear_list):
                 inverted_index['appear_list'].append(appear)
                 appear_cnt += 1
             wait_list.append(inverted_index)
-            if len(wait_list) > 5000 or pbar.n + 1 == pbar.total:
+            if len(wait_list) > 5000:
                 print("insert_many InvertedIndex")
                 collection_inverted_index.insert_many(wait_list)
                 wait_list = []
             pbar.update(1)
+    if len(wait_list) > 0:
+        collection_inverted_index.insert_many(wait_list)
     return score_dict
 
 
@@ -220,9 +266,8 @@ def sort_children(node):
 
 def build_trie(db, score_dict):
     collection_inverted_index = db['InvertedIndex']
-    inverted_index_list = collection_inverted_index.find()
     word_list = []
-    for inverted_index in inverted_index_list:
+    for inverted_index in collection_inverted_index.find():
         word_list += [inverted_index['term']]
     word_list = sorted(word_list)
     # for word in word_list[:100]:
@@ -238,18 +283,63 @@ def build_trie(db, score_dict):
     collection_trie.insert_many(root['children'])
 
 
+def calc_doc_vec(db, doc_files, emb):
+    collection_doc_vec = db['DocVec']
+    collection_paper = db['Paper']
+    collection_inverted_index = db['InvertedIndex']
+    doc_vec_list = []
+    inverted_index_dict = {}
+    paper_num = 0
+    total_doc = len(doc_files)
+    for inverted_index in collection_inverted_index.find():
+        inverted_index_dict[inverted_index['term']] = len(inverted_index['appear_list'])
+    with tqdm(total=len(doc_files), desc="Calculating Document Vector") as pbar:
+        for paper in collection_paper.find():
+            file = paper['path']
+            try:
+                root = parse(file).documentElement
+                full_text = root.getElementsByTagName("QW")[0].getAttribute("value")
+            except Exception:
+                pbar.update(1)
+                continue
+            seg_list = trim_and_cut(full_text)
+            full_text_list = []
+            for seg_text in seg_list:
+                full_text_list += cutter.cut(seg_text)
+            doc_len = len(full_text_list)
+            word_dict = defaultdict(int)
+            for word, _ in full_text_list:
+                word_dict[word] += 1
+            doc_vec = [0] * 300
+            for word, times in word_dict.items():
+                word_doc = inverted_index_dict[word]
+                tf_idf = times / doc_len * np.log(total_doc / (word_doc + 1))
+                # print('word: {}, vector: {}'.format(word, emb.get_emb(word)))
+                doc_vec = [np.around(x * tf_idf + y, decimals=2) for x, y in zip(emb.get_emb(word), doc_vec)]
+            doc_vec_list += [{'pid': paper_num, 'vec': doc_vec}]
+            if len(doc_vec_list) > 5000:
+                print('insert_many doc_vec')
+                collection_doc_vec.insert_many(doc_vec_list)
+                doc_vec_list = []
+            pbar.update(1)
+    if len(doc_vec_list) > 0:
+        print('insert_many doc_vec')
+        collection_doc_vec.insert_many(doc_vec_list)
+
+
 if __name__ == "__main__":
     start = time.time()
     doc_files = read_all_doc_files(base_path)
     # shuffle(doc_files)
     doc_files = [item for item in doc_files]
-    doc_files = doc_files[:10000]
+    doc_files = doc_files[:1000]
     print('#File: ' + str(len(doc_files)))
 
     client = pymongo.MongoClient(host="localhost", port=27017)
     db = client['SearchEngine']
 
-    doc_length, inverted_index_dict, appear_list = extract_appearance_and_labels(db, doc_files)
-    score_dict = construct_inverted_index(db, doc_length, inverted_index_dict, appear_list)
-    build_trie(db, score_dict)
+    # doc_length, inverted_index_dict, appear_list = extract_appearance_and_labels(db, doc_files)
+    # score_dict = construct_inverted_index(db, doc_length, inverted_index_dict, appear_list)
+    # build_trie(db, score_dict)
+    calc_doc_vec(db, doc_files, Embedding(emb_file))
     print("Total Elapsed Time: {}s".format(time.time() - start))
