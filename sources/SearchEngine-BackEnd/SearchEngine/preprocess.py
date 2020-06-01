@@ -341,9 +341,8 @@ def calc_doc_vec(db, doc_files, emb):
 if __name__ == "__main__":
     start = time.time()
     doc_files = read_all_doc_files(base_path)
-    shuffle(doc_files)
-    doc_files = [item for item in doc_files]
-    doc_files = doc_files[:10]
+    # shuffle(doc_files)
+    # doc_files = doc_files[:10000]
     print('#File: ' + str(len(doc_files)))
 
     client = pymongo.MongoClient(host="localhost", port=27017)

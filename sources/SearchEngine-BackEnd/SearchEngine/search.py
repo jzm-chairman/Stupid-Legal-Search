@@ -8,6 +8,7 @@ import numpy as np
 import pymongo
 import random
 from functools import reduce
+import time
 
 root_dir = "../../../"
 # doc_files_store = root_dir + "temp/filename.pkl"
@@ -24,8 +25,9 @@ need_stats_keys = ["AJLB", "SPCX", "WSZL", "XZQH_P", "JAND", "LB"]
 
 # unpack_info = lambda ds, iis: (pickle.loads(open(ds, "rb").read()), json.loads(open(iis, "r+", encoding="utf-8").read()))
 
-MAX_CACHE_SIZE = 10000
-summary_cache = LRUCache(maxsize=MAX_CACHE_SIZE)
+MAX_CACHE_SIZE = 200000
+# summary_cache = LRUCache(maxsize=MAX_CACHE_SIZE)
+summary_cache = {}
 document_cache = LRUCache(maxsize=MAX_CACHE_SIZE)
 # doc_files = [root_dir + file for file in pickle.loads(open(doc_files_store, "rb").read()]
 cn_to_key = {'案件类别': 'AJLB', '审判程序': 'SPCX', '文书种类': 'WSZL', '行政区划(省)': 'XZQH_P', '结案年度': 'JAND',
@@ -36,6 +38,12 @@ key_to_cn = {value : key for key, value in cn_to_key.items()}
 
 # inverted_index_all = {item["term"] : {"appear_list": item["appear_list"]} for item in collection_inverted_index.find()}
 # print("Inverted Index Size:", len(inverted_index_all))
+
+def get_all_paper_info(): # 加速：一次性将数据库文档部分装入内存
+    all_paper_info = collection_paper.find()
+    global summary_cache
+    summary_cache = {item["pid"] : {**{key_to_cn[key] : item[key] for key in key_to_cn if key in item}, **{"index" : item["pid"]}} for item in all_paper_info}
+get_all_paper_info()
 
 def get_inverted_index(term):
     return collection_inverted_index.find_one({'term': term})
