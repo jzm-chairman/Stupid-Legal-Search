@@ -2,6 +2,7 @@ from django.http import HttpResponse
 from SearchEngine.models import *
 import pickle, json, time
 from .search import *
+from threading import Thread
 
 # doc_files_store = "../../temp/filename.pkl"
 # inverted_index_store = "../../temp/inverted_index.json"
@@ -14,7 +15,6 @@ def response(body):
     responses["Access-Control-Allow-Origin"] = "*"
     responses['Access-Control-Allow-Headers'] = "content-type"
     return responses
-
 
 def search(request):
     print('Enter Search')

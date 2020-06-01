@@ -5,7 +5,7 @@ import pickle
 from tqdm import tqdm
 import thulac
 from random import shuffle
-from utils import *
+from .utils import *
 from collections import defaultdict
 import numpy as np
 import pymongo
@@ -14,8 +14,8 @@ import time
 cutter = thulac.thulac(seg_only=True, filt=True)
 
 # dir = "../../../" # change it for data file path
-# dir = "D:\\Stupid-Legal-Search\\dataset\\"
-dir = 'E:\\Tsinghua\\2020_spring\\SearchEngine\\Project\\' # 使用绝对路径
+dir = "D:\\Stupid-Legal-Search\\dataset\\"
+# dir = 'E:\\Tsinghua\\2020_spring\\SearchEngine\\Project\\' # 使用绝对路径
 base_path = [dir + item for item in ["xml_1", "xml_2", "xml_3", "xml_4"]]
 emb_file = dir + 'word_embedding\\sgns.renmin.word'
 
@@ -288,8 +288,7 @@ if __name__ == "__main__":
     start = time.time()
     doc_files = read_all_doc_files(base_path)
     shuffle(doc_files)
-    doc_files = [item for item in doc_files]
-    doc_files = doc_files[:10]
+    doc_files = doc_files[:20000]
     print('#File: ' + str(len(doc_files)))
 
     client = pymongo.MongoClient(host="localhost", port=27017)
