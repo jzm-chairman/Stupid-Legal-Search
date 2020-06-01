@@ -7,18 +7,20 @@ from cachetools import LRUCache
 import numpy as np
 import pymongo
 import random
+from functools import reduce
 
 root_dir = "../../../"
-doc_files_store = root_dir + "temp/filename.pkl"
+# doc_files_store = root_dir + "temp/filename.pkl"
 inverted_index_store = root_dir + "temp/inverted_index.json"
 cutter = thulac.thulac(seg_only=True, filt=True)
 client = pymongo.MongoClient(host="localhost", port=27017)
 db = client['SearchEngine']
+# db = client['SearchTest']
 collection_paper = db['Paper']
 collection_inverted_index = db['InvertedIndex']
 collection_trie = db['Trie']
 # need_stats_keys = ["案件类别", "审判程序", "文书种类", "行政区划(省)", "结案年度"]
-need_stats_keys = ["AJLB", "SPCX", "WSZL", "XZQH_P", "JAND"]
+need_stats_keys = ["AJLB", "SPCX", "WSZL", "XZQH_P", "JAND", "LB"]
 
 # unpack_info = lambda ds, iis: (pickle.loads(open(ds, "rb").read()), json.loads(open(iis, "r+", encoding="utf-8").read()))
 
@@ -28,7 +30,8 @@ document_cache = LRUCache(maxsize=MAX_CACHE_SIZE)
 # doc_files = [root_dir + file for file in pickle.loads(open(doc_files_store, "rb").read()]
 cn_to_key = {'案件类别': 'AJLB', '审判程序': 'SPCX', '文书种类': 'WSZL', '行政区划(省)': 'XZQH_P', '结案年度': 'JAND',
              '裁判时间': 'CPSJ', '行政区划(市)': 'XZQH_C', '行政区划(区县)': 'XZQH_CC',
-             '经办法院': 'JBFY', '法官人员完整': 'FGRYWZ', '文首': 'WS', '法律法条分组': 'FLFTFZ'}
+             '经办法院': 'JBFY', '法官人员完整': 'FGRYWZ', '文首': 'WS', '法律法条分组': 'FLFTFZ',
+             '案例类别': 'LB', '全文': 'QW', '案例原则': 'ALYZ', '标题': 'title'}
 key_to_cn = {value : key for key, value in cn_to_key.items()}
 
 # inverted_index_all = {item["term"] : {"appear_list": item["appear_list"]} for item in collection_inverted_index.find()}
@@ -56,7 +59,7 @@ def filters(doc_recall, condition):
     cursor = query_by_condition(condition, doc_recall)
     # ret = list(set(doc_recall) & {item["pid"] for item in cursor})
     ret = [item["pid"] for item in cursor]
-    print(len(ret))
+    print('Filter len: {}'.format(len(ret)))
     return ret
 
 
@@ -70,26 +73,36 @@ def recall(words):
     return list(doc_recall)
 
 
+MAX_RANK_CACHE_SIZE = 100
+rank_cache = LRUCache(maxsize=MAX_RANK_CACHE_SIZE)
 # def rank(doc_recall):
 #     rank关键字BM25 score
 #     返回pid列表
-def rank(doc_recall, words):
+
+
+def rank(doc_recall, words, rank_key):
+    rank_cache_key = reduce(lambda x, y: x + y, map(str, rank_key))
+    if rank_cache_key in rank_cache:
+        return rank_cache[rank_cache_key]
     local_doc_index = {pid: index for (index, pid) in enumerate(doc_recall)} # 方便计算分数用的
     scores = np.zeros(len(doc_recall))
+    word_appear_list = []
     for word in words:
-        inverted_index = get_inverted_index(word)
-        if inverted_index:
-            for pid in doc_recall:
-                for appear in inverted_index['appear_list']:
-                    if appear['pid'] == pid:
-                        scores[local_doc_index[pid]] += appear['score']
+        word_appear_list += [(0, get_inverted_index(word)['appear_list'])]
+    for pid in doc_recall:
+        for pt, appear_list in word_appear_list:
+            while pt < len(appear_list) and appear_list[pt]['pid'] < pid:
+                pt += 1
+            if pt < len(appear_list) and appear_list[pt]['pid'] == pid:
+                scores[local_doc_index[pid]] += appear_list[pt]['score']
     doc_rank = [doc_recall[i] for i in scores.argsort()[::-1]]
+    rank_cache[rank_cache_key] = doc_rank
     return doc_rank
 
 
 def get_meta_info(pid_list):
     # 根据索引获取文档内容
-    normal_keys = ["WS", "CPSJ", "AJLB", "SPCX", "WSZL", "XZQH_P", "JAND", "FLFTFZ", "FGRYWZ"]
+    normal_keys = ["LB", "title", "WS", "CPSJ", "AJLB", "SPCX", "WSZL", "XZQH_P", "JAND", "FLFTFZ", "FGRYWZ"]
     # 文首，裁判时间，案件类别，审判程序，文书种类，行政区划(省)，结案年度
     rets = {}
     results = []
@@ -97,6 +110,8 @@ def get_meta_info(pid_list):
     for pid in pid_list:
         if pid not in summary_cache:
             paper_info = get_paper_info(pid)
+            if paper_info is None:
+                continue
             item = {key_to_cn[key] : paper_info[key] for key in normal_keys}
             item["index"] = pid
             summary_cache[pid] = item
@@ -128,12 +143,8 @@ def get_best_word(node):
         res = ''
     else:
         for child in node['children']:
-            print('traverse ch: {}, score: {}'.format(child['char'], child['max_score']))
             if child['cnt'] > 0 and child['max_score'] == node['max_score']:
-                print('enter ch: {}'.format(child['char']))
-                print('before: ', child)
                 res = child['char'] + get_best_word(child)
-                print('after: ', child)
                 break
     if res is not None:
         node['cnt'] -= 1
@@ -167,7 +178,7 @@ def get_recommended_words(prefix):
     return rec_list
 
 
-SUMMARY_CHARS = 100
+SUMMARY_CHARS = 140
 
 def fill_in_summary(results, keywords):
     for i, result in enumerate(results):
@@ -195,6 +206,9 @@ def fill_in_summary(results, keywords):
             if swe - sws > max_word_count:
                 max_word_count = swe - sws
                 selection_index = sws
+        if len(offsets) == 0:
+            result["摘要"] = str(keywords)
+            continue
         slice_start, slice_end = offsets[selection_index], offsets[selection_index + max_word_count - 1]
         slice_start = max(0, slice_start - max(0, int((SUMMARY_CHARS - (slice_end - slice_start)) / 2)))
         result["摘要"] = ("..." if slice_start > 0 else "") + full_text[slice_start:slice_start+SUMMARY_CHARS] + ("..." if slice_start + SUMMARY_CHARS < len(full_text) else "")
@@ -204,21 +218,36 @@ MAX_RECOMMENDATION = 10
 def get_single_detail(doc):
     if doc in document_cache:
         return document_cache[doc]
+    if doc not in summary_cache:
+        get_meta_info([doc])
     root = parse(get_paper_info(doc)['path']).documentElement
-    keys = ["QW", "WS", "JBFY", "AH", "CPSJ", "DSR", "DSRD", "SSJL", "AJJBQK", "AJJBQKD", "AJSSD", "CPFXGC", "QSFXD", "PJJG", "BSPJJG", "WW", "AJLB", "SPCX", "WSZL", "XZQH_P", "JAND"]
-    # 全文，文首，经办法院，案号，裁判时间，当事人，当事人段，诉讼记录，案件基本情况，案件基本情况段，案件事实段，裁判分析过程，起诉分析段，判决结果，本审判决结果，文尾，案件类别，审判程序，文书种类，行政区划(省)，结案年度
+    keys = ["title", "LB", "ALYZ", "QW", "WS", "JBFY", "AH", "CPSJ", "DSR", "DSRD", "SSJL", "AJJBQK", "AJJBQKD", "AJSSD", "CPFXGC", "QSFXD", "PJJG", "BSPJJG", "WW", "AJLB", "SPCX", "WSZL", "XZQH_P", "JAND"]
+    # 标题，案例类别，全文，文首，经办法院，案号，裁判时间，当事人，当事人段，诉讼记录，案件基本情况，案件基本情况段，案件事实段，裁判分析过程，起诉分析段，判决结果，本审判决结果，文尾，案件类别，审判程序，文书种类，行政区划(省)，结案年度
     # escape_keys = {"AJLB", "SPCX", "WSZL", "XZQH_P", "JAND"}  # 不需要加格式的字段
     item = {}
     item["filename"] = get_paper_info(doc)['path']
     for xml_key in keys:
         elems = root.getElementsByTagName(xml_key)
+        if xml_key in key_to_cn and key_to_cn[xml_key] in summary_cache[doc]:
+            key_cn = key_to_cn[xml_key]
+            item[key_cn] = summary_cache[doc][key_cn]
+            continue
         if len(elems) == 0:
             continue
-        key_cn = elems[0].getAttribute("nameCN")
-        value = elems[0].getAttribute("value")
+        if elems[0].hasAttribute("nameCN"):
+            key_cn = elems[0].getAttribute("nameCN")
+        elif xml_key in key_to_cn:
+            key_cn = key_to_cn[xml_key]
+        else:
+            continue
+        value = ""
+        for elem in elems:
+            if elem.hasAttribute("value"):
+                value = elem.getAttribute("value")
+                break
+        if xml_key == "DSRD":
+            value = " ".join([x.getAttribute("value") for x in elems])
         item[key_cn] = value
-    if doc not in summary_cache:
-        get_meta_info([doc])
     keys_from_db = ["法官人员完整", "法律法条分组"]
     keys_to_frontend = ["同法官案件推荐", "同法律案件推荐"]
     item = {**item, **{key : summary_cache[doc][key] for key in keys_from_db}, **{_: [] for _ in keys_to_frontend}}

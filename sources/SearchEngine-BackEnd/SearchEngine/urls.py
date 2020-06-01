@@ -20,5 +20,5 @@ import SearchEngine.views as views
 urlpatterns = [
     re_path(r'^search/?$', views.search),
     re_path(r'^detail/?$', views.detail),
-    re_path(r'^recommend/?$', views.recommend),
+    re_path(r'^recommend/?$', views.recommend)
 ]
