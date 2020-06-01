@@ -9,6 +9,8 @@ import pymongo
 import random
 from functools import reduce
 import time
+from .utils import *
+from threading import Thread
 
 root_dir = "../../../"
 # doc_files_store = root_dir + "temp/filename.pkl"
@@ -22,12 +24,13 @@ collection_inverted_index = db['InvertedIndex']
 collection_trie = db['Trie']
 # need_stats_keys = ["案件类别", "审判程序", "文书种类", "行政区划(省)", "结案年度"]
 need_stats_keys = ["AJLB", "SPCX", "WSZL", "XZQH_P", "JAND", "LB"]
+emb_file = root_dir + 'word_embedding\\sgns.renmin.word'
+# emb = Embedding(emb_file)
 
 # unpack_info = lambda ds, iis: (pickle.loads(open(ds, "rb").read()), json.loads(open(iis, "r+", encoding="utf-8").read()))
 
 MAX_CACHE_SIZE = 200000
 # summary_cache = LRUCache(maxsize=MAX_CACHE_SIZE)
-summary_cache = {}
 document_cache = LRUCache(maxsize=MAX_CACHE_SIZE)
 # doc_files = [root_dir + file for file in pickle.loads(open(doc_files_store, "rb").read()]
 cn_to_key = {'案件类别': 'AJLB', '审判程序': 'SPCX', '文书种类': 'WSZL', '行政区划(省)': 'XZQH_P', '结案年度': 'JAND',
@@ -39,11 +42,19 @@ key_to_cn = {value : key for key, value in cn_to_key.items()}
 # inverted_index_all = {item["term"] : {"appear_list": item["appear_list"]} for item in collection_inverted_index.find()}
 # print("Inverted Index Size:", len(inverted_index_all))
 
-def get_all_paper_info(): # 加速：一次性将数据库文档部分装入内存
-    all_paper_info = collection_paper.find()
-    global summary_cache
-    summary_cache = {item["pid"] : {**{key_to_cn[key] : item[key] for key in key_to_cn if key in item}, **{"index" : item["pid"]}} for item in all_paper_info}
-get_all_paper_info()
+# 加速：一次性将数据库文档部分装入内存
+all_paper_info = collection_paper.find()
+summary_cache = {item["pid"] : {**{key_to_cn[key] : item[key] for key in key_to_cn if key in item}, **{"index" : item["pid"]}} for item in all_paper_info}
+
+scan_times = 0
+def async_scan_files(doc_list):
+    global scan_times
+    scan_times += 1
+    local_times = scan_times
+    print("Start Prefetch:", local_times)
+    for doc in doc_list:
+        get_single_detail(doc)
+    print("Prefetch Documents Done:", local_times)
 
 def get_inverted_index(term):
     return collection_inverted_index.find_one({'term': term})
@@ -95,14 +106,19 @@ def rank(doc_recall, words, rank_key):
     local_doc_index = {pid: index for (index, pid) in enumerate(doc_recall)} # 方便计算分数用的
     scores = np.zeros(len(doc_recall))
     word_appear_list = []
+    pt_list = []
     for word in words:
-        word_appear_list += [(0, get_inverted_index(word)['appear_list'])]
+        word_appear_list += [get_inverted_index(word)['appear_list']]
+        pt_list += [0]
     for pid in doc_recall:
-        for pt, appear_list in word_appear_list:
+        new_pt_list = []
+        for pt, appear_list in zip(pt_list, word_appear_list):
             while pt < len(appear_list) and appear_list[pt]['pid'] < pid:
                 pt += 1
             if pt < len(appear_list) and appear_list[pt]['pid'] == pid:
                 scores[local_doc_index[pid]] += appear_list[pt]['score']
+            new_pt_list += [pt]
+        pt_list = new_pt_list
     doc_rank = [doc_recall[i] for i in scores.argsort()[::-1]]
     rank_cache[rank_cache_key] = doc_rank
     return doc_rank
@@ -110,7 +126,7 @@ def rank(doc_recall, words, rank_key):
 
 def get_meta_info(pid_list):
     # 根据索引获取文档内容
-    normal_keys = ["LB", "title", "WS", "CPSJ", "AJLB", "SPCX", "WSZL", "XZQH_P", "JAND", "FLFTFZ", "FGRYWZ"]
+    normal_keys = ["LB", "title", "WS", "CPSJ", "AJLB", "SPCX", "WSZL", "XZQH_P", "JAND"]
     # 文首，裁判时间，案件类别，审判程序，文书种类，行政区划(省)，结案年度
     rets = {}
     results = []
@@ -189,8 +205,14 @@ def get_recommended_words(prefix):
 SUMMARY_CHARS = 140
 
 def fill_in_summary(results, keywords):
+    t = Thread(target=async_scan_files, args=([item["index"] for item in results],), daemon=True)
+    t.start()
     for i, result in enumerate(results):
-        full_text = get_single_detail(result["index"])["全文"]
+        doc = result["index"]
+        if doc in document_cache:
+            full_text = document_cache[doc]["全文"]
+        else:
+            full_text = parse(get_paper_info(doc)['path']).documentElement.getElementsByTagName("QW")[0].getAttribute("value")
         offsets = []
         for word in keywords:
             if word not in full_text:
@@ -221,7 +243,7 @@ def fill_in_summary(results, keywords):
         slice_start = max(0, slice_start - max(0, int((SUMMARY_CHARS - (slice_end - slice_start)) / 2)))
         result["摘要"] = ("..." if slice_start > 0 else "") + full_text[slice_start:slice_start+SUMMARY_CHARS] + ("..." if slice_start + SUMMARY_CHARS < len(full_text) else "")
 
-MAX_RECOMMENDATION = 10
+MAX_RECOMMENDATION = 5
 
 def get_single_detail(doc):
     if doc in document_cache:
@@ -268,6 +290,11 @@ def get_single_detail(doc):
             item[keys_to_frontend[i]].append(cases[:MAX_RECOMMENDATION])
     document_cache[doc] = item
     return item
+
+
+def get_recommended_doc(text):
+    # TODO
+    pass
 
 
 def main_loop():
