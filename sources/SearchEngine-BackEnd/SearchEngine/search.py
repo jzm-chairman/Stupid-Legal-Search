@@ -22,10 +22,11 @@ db = client['SearchEngine']
 collection_paper = db['Paper']
 collection_inverted_index = db['InvertedIndex']
 collection_trie = db['Trie']
+collection_doc_vec = db['DocVec']
 # need_stats_keys = ["案件类别", "审判程序", "文书种类", "行政区划(省)", "结案年度"]
 need_stats_keys = ["AJLB", "SPCX", "WSZL", "XZQH_P", "JAND", "LB"]
 emb_file = root_dir + 'word_embedding\\sgns.renmin.word'
-# emb = Embedding(emb_file)
+emb = Embedding(emb_file)
 
 # unpack_info = lambda ds, iis: (pickle.loads(open(ds, "rb").read()), json.loads(open(iis, "r+", encoding="utf-8").read()))
 
@@ -292,9 +293,45 @@ def get_single_detail(doc):
     return item
 
 
-def get_recommended_doc(text):
-    # TODO
-    pass
+MAX_DOC_RECOMMENDATION = 5
+def get_recommended_docs(text):
+    # text: 长文本
+    # return: pid列表
+    seg_list = trim_and_cut(text)
+    word_list = []
+    for seg_text in seg_list:
+        word_list += cutter.cut(seg_text)
+    print('word_list: {}'.format(word_list))
+    word_set = set([x[0] for x in word_list])
+    doc_len = len(word_list)
+    word_times_dict = defaultdict(int)
+    word_doc_dict = defaultdict(int)
+    inverted_index_list = collection_inverted_index.find({'term': {'$in': list(word_set)}})
+    for word, _ in word_list:
+        word_times_dict[word] += 1
+    for inverted_index in inverted_index_list:
+        word_doc_dict[inverted_index['term']] = len(inverted_index['appear_list'])
+    print('word_doc_dict size: {}'.format(len(word_doc_dict.keys())))
+    tgt_doc_vec = calc_doc_vec(word_times_dict, word_doc_dict, 10, doc_len, emb)
+    min_dis = [1e9] * MAX_DOC_RECOMMENDATION
+    res_pid = [-1] * MAX_DOC_RECOMMENDATION
+
+    def calc_dis(v1, v2):
+        v1, v2 = np.array(v1), np.array(v2)
+        v = v1 - v2
+        return np.sqrt(np.dot(v, v))
+
+    for doc_dict in collection_doc_vec.find():
+        now_dis = calc_dis(doc_dict['vec'], tgt_doc_vec)
+        for i, dis in enumerate(min_dis):
+            if now_dis < dis:
+                for j in reversed(range(i + 1, MAX_DOC_RECOMMENDATION)):
+                    res_pid[j] = res_pid[j - 1]
+                    min_dis[j] = min_dis[j - 1]
+                min_dis[i] = now_dis
+                res_pid[i] = doc_dict['pid']
+                break
+    return res_pid  # May contain -1
 
 
 def main_loop():

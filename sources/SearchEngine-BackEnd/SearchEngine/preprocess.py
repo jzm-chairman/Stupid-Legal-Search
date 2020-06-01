@@ -5,7 +5,7 @@ import pickle
 from tqdm import tqdm
 import thulac
 from random import shuffle
-from utils import *
+from .utils import *
 from collections import defaultdict
 import numpy as np
 import pymongo
@@ -83,11 +83,6 @@ def get_BM25(tf, doc_len, avg_len, total_doc, term_doc):
     lp = 1 - b + b * doc_len / avg_len # 长度惩罚项
     tfs = ((k + 1) * tf) / (k * lp + tf) # TF Score
     return idf * tfs
-
-
-def trim_and_cut(text):
-    text = re.split(r"[^0-9\u4e00-\u9af5]", text)
-    return text
 
 
 def parse_paper(file_path, pid):
@@ -248,7 +243,7 @@ def build_trie(db, score_dict):
     collection_trie.insert_many(root['children'])
 
 
-def calc_doc_vec(db, doc_files, emb):
+def construct_doc_vec(db, doc_files, emb):
     collection_doc_vec = db['DocVec']
     collection_paper = db['Paper']
     collection_inverted_index = db['InvertedIndex']
@@ -272,15 +267,11 @@ def calc_doc_vec(db, doc_files, emb):
             for seg_text in seg_list:
                 full_text_list += cutter.cut(seg_text)
             doc_len = len(full_text_list)
-            word_dict = defaultdict(int)
+            word_times_dict = defaultdict(int)
+            word_doc_dict = inverted_index_dict
             for word, _ in full_text_list:
-                word_dict[word] += 1
-            doc_vec = [0] * 300
-            for word, times in word_dict.items():
-                word_doc = inverted_index_dict[word]
-                tf_idf = times / doc_len * np.log(total_doc / (word_doc + 1))
-                # print('word: {}, vector: {}'.format(word, emb.get_emb(word)))
-                doc_vec = [np.around(x * tf_idf + y, decimals=2) for x, y in zip(emb.get_emb(word), doc_vec)]
+                word_times_dict[word] += 1
+            doc_vec = calc_doc_vec(word_times_dict, word_doc_dict, total_doc, doc_len, emb)
             doc_vec_list += [{'pid': paper_num, 'vec': doc_vec}]
             paper_num += 1
             if len(doc_vec_list) > 5000:
@@ -307,5 +298,5 @@ if __name__ == "__main__":
     # doc_length, inverted_index_dict, appear_list = extract_appearance_and_labels(db, doc_files)
     # score_dict = construct_inverted_index(db, doc_length, inverted_index_dict, appear_list)
     # build_trie(db, score_dict)
-    calc_doc_vec(db, doc_files, Embedding(emb_file))
+    construct_doc_vec(db, doc_files, Embedding(emb_file))
     print("Total Elapsed Time: {}s".format(time.time() - start))
