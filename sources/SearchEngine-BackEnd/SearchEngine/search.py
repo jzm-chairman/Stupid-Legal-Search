@@ -8,6 +8,7 @@ import numpy as np
 import pymongo
 import random
 from functools import reduce
+from .utils import *
 
 root_dir = "../../../"
 # doc_files_store = root_dir + "temp/filename.pkl"
@@ -21,6 +22,8 @@ collection_inverted_index = db['InvertedIndex']
 collection_trie = db['Trie']
 # need_stats_keys = ["案件类别", "审判程序", "文书种类", "行政区划(省)", "结案年度"]
 need_stats_keys = ["AJLB", "SPCX", "WSZL", "XZQH_P", "JAND", "LB"]
+emb_file = root_dir + 'word_embedding\\sgns.renmin.word'
+# emb = Embedding(emb_file)
 
 # unpack_info = lambda ds, iis: (pickle.loads(open(ds, "rb").read()), json.loads(open(iis, "r+", encoding="utf-8").read()))
 
@@ -87,14 +90,19 @@ def rank(doc_recall, words, rank_key):
     local_doc_index = {pid: index for (index, pid) in enumerate(doc_recall)} # 方便计算分数用的
     scores = np.zeros(len(doc_recall))
     word_appear_list = []
+    pt_list = []
     for word in words:
-        word_appear_list += [(0, get_inverted_index(word)['appear_list'])]
+        word_appear_list += [get_inverted_index(word)['appear_list']]
+        pt_list += [0]
     for pid in doc_recall:
-        for pt, appear_list in word_appear_list:
+        new_pt_list = []
+        for pt, appear_list in zip(pt_list, word_appear_list):
             while pt < len(appear_list) and appear_list[pt]['pid'] < pid:
                 pt += 1
             if pt < len(appear_list) and appear_list[pt]['pid'] == pid:
                 scores[local_doc_index[pid]] += appear_list[pt]['score']
+            new_pt_list += [pt]
+        pt_list = new_pt_list
     doc_rank = [doc_recall[i] for i in scores.argsort()[::-1]]
     rank_cache[rank_cache_key] = doc_rank
     return doc_rank
@@ -260,6 +268,11 @@ def get_single_detail(doc):
             item[keys_to_frontend[i]].append(cases[:MAX_RECOMMENDATION])
     document_cache[doc] = item
     return item
+
+
+def get_recommended_doc(text):
+    # TODO
+    pass
 
 
 def main_loop():

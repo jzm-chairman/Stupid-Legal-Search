@@ -5,11 +5,10 @@ import pickle
 from tqdm import tqdm
 import thulac
 from random import shuffle
-# import mongoengine
+from .utils import *
 from collections import defaultdict
 import numpy as np
 import pymongo
-import sys
 import time
 
 cutter = thulac.thulac(seg_only=True, filt=True)
@@ -19,50 +18,6 @@ cutter = thulac.thulac(seg_only=True, filt=True)
 dir = 'E:\\Tsinghua\\2020_spring\\SearchEngine\\Project\\' # 使用绝对路径
 base_path = [dir + item for item in ["xml_1", "xml_2", "xml_3", "xml_4"]]
 emb_file = dir + 'word_embedding\\sgns.renmin.word'
-
-
-def is_chinese_char(ch):
-    return '\u4e00' <= ch <= '\u9fff'
-
-
-def is_chinese_str(s):
-    for c in s:
-        if not is_chinese_char(c):
-            return False
-    return True
-
-
-class Embedding:
-    def __init__(self, file):
-        begin_time = time.time()
-        cnt = 0
-        self.unk_id = 0
-        # self.id_to_key = ['UNK']
-        # self.key_to_id = {'UNK': 0}
-        self.id_to_key = []
-        self.key_to_id = defaultdict(int)
-        self.id_to_emb = [[0] * 300]
-        with open(file, "r", encoding='utf8') as f:
-            for i, line in enumerate(f.readlines()):
-                val_list = line.split(' ')
-
-                if i == 0:
-                    self.dim = int(val_list[1])
-                else:
-                    word = val_list[0]
-                    if is_chinese_char(word):
-                        cnt += 1
-                        self.id_to_key += [word]
-                        self.key_to_id[word] = cnt
-                        self.id_to_emb += [list(map(lambda x: float(x), val_list[1: -1]))]
-                # if i > 100:
-                #     break
-        self.cnt = cnt
-        print("embedding load finishs, got %d words, cost %lf time" % (cnt, time.time() - begin_time))
-
-    def get_emb(self, word):
-        word = self.key_to_id[word]
-        return self.id_to_emb[word]
 
 
 def traverse(path, pattern, store):
@@ -343,7 +298,7 @@ if __name__ == "__main__":
     doc_files = read_all_doc_files(base_path)
     shuffle(doc_files)
     doc_files = [item for item in doc_files]
-    doc_files = doc_files[:10]
+    doc_files = doc_files[:5000]
     print('#File: ' + str(len(doc_files)))
 
     client = pymongo.MongoClient(host="localhost", port=27017)
@@ -353,5 +308,5 @@ if __name__ == "__main__":
     doc_length, inverted_index_dict, appear_list = extract_appearance_and_labels(db, doc_files)
     score_dict = construct_inverted_index(db, doc_length, inverted_index_dict, appear_list)
     build_trie(db, score_dict)
-    calc_doc_vec(db, doc_files, Embedding(emb_file))
+    # calc_doc_vec(db, doc_files, Embedding(emb_file))
     print("Total Elapsed Time: {}s".format(time.time() - start))
