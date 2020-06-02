@@ -322,8 +322,7 @@ def get_similar_docs_by_vec(tgt_doc_vec, ignore_pid=-1):
 
     def calc_dis(v1, v2):
         v1, v2 = np.array(v1), np.array(v2)
-        v = v1 - v2
-        return np.sqrt(np.dot(v, v))
+        return np.dot(v1, v2) / np.sqrt(np.dot(v1, v1) * np.dot(v2, v2))
 
     for doc_dict in collection_doc_vec.find():
         if doc_dict['pid'] == ignore_pid:
