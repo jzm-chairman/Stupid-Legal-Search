@@ -317,29 +317,31 @@ def get_recommended_docs(text):
     for inverted_index in inverted_index_list:
         word_doc_dict[inverted_index['term']] = len(inverted_index['appear_list'])
     print('word_doc_dict size: {}'.format(len(word_doc_dict.keys())))
-    tgt_doc_vec = calc_doc_vec(word_times_dict, word_doc_dict, 10, doc_len, emb)
+    tgt_doc_vec = calc_doc_vec(word_times_dict, word_doc_dict, 163634, doc_len, emb)
     return get_similar_docs_by_vec(tgt_doc_vec)  # May contain -1
 
 
-def get_similar_docs_by_vec(tgt_doc_vec):
+def get_similar_docs_by_vec(tgt_doc_vec, ignore_pid=-1):
     min_dis = [1e9] * MAX_DOC_RECOMMENDATION
     res_pid = [-1] * MAX_DOC_RECOMMENDATION
 
     def calc_dis(v1, v2):
         v1, v2 = np.array(v1), np.array(v2)
-        v = v1 - v2
-        return np.sqrt(np.dot(v, v))
-
+        return 1 - np.dot(v1, v2) / np.sqrt(np.dot(v1, v1) * np.dot(v2, v2))
+    # print(tgt_doc_vec)
     for doc_dict in collection_doc_vec.find():
+        if doc_dict['pid'] == ignore_pid:
+            continue
         now_dis = calc_dis(doc_dict['vec'], tgt_doc_vec)
         for i, dis in enumerate(min_dis):
             if now_dis < dis:
                 for j in reversed(range(i + 1, MAX_DOC_RECOMMENDATION)):
-                    res_pid[j] = res_pid[j - 1]
                     min_dis[j] = min_dis[j - 1]
+                    res_pid[j] = res_pid[j - 1]
                 min_dis[i] = now_dis
                 res_pid[i] = doc_dict['pid']
                 break
+    print(min_dis)
     return res_pid
 
 
@@ -349,7 +351,7 @@ def get_similar_docs(pid):
         full_text = get_single_detail(pid)["全文"]
         return get_recommended_docs(full_text)
     tgt_doc_vec = vec_item['vec']
-    return get_similar_docs_by_vec(tgt_doc_vec)
+    return get_similar_docs_by_vec(tgt_doc_vec, pid)
     
 
 def main_loop():

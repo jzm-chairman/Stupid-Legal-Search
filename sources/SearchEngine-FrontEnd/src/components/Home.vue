@@ -6,6 +6,7 @@
             @keyup.enter.native="link"
             :trigger-on-focus="false"
             :fetch-suggestions="prompt"
+            @select="link"
             >
               <el-button type="primary" @click="link" slot="append">搜索</el-button>
             </el-autocomplete>
@@ -27,7 +28,7 @@ export default {
       this.$router.push({path: '/result', query: {searchkey: this.searchkey}})
     },
     prompt (input, callback) {
-      GET('/recommend', { prefix: input }).then(response => {
+      GET('/recommend_words', { prefix: input }).then(response => {
         this.prompt_list = []
         for (var i in response.result) {
           this.prompt_list.push({value: response.result[i]})

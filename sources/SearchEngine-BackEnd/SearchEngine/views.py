@@ -77,7 +77,8 @@ def recommend_words(request):
 def recommend_docs(request):
     text = request.GET.get("text")
     res_list = get_recommended_docs(text)
-    return response(json.dumps({'result': res_list}, ensure_ascii=False))
+    doc_info = get_meta_info(res_list)["results"]
+    return response(json.dumps({'result': doc_info}, ensure_ascii=False))
 
 
 def recommend_similar_docs(request):

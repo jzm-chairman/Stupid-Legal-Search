@@ -55,7 +55,7 @@ def calc_doc_vec(word_times_dict, word_doc_dict, total_doc, doc_len, emb):
     doc_vec = [0] * 300
     for word, times in word_times_dict.items():
         word_doc = word_doc_dict[word]
-        tf_idf = times / doc_len * np.log(total_doc / (word_doc + 1))
+        tf_idf = times * np.log(total_doc / (word_doc + 1))
         # print('word: {}, vector: {}'.format(word, emb.get_emb(word)))
         doc_vec = [np.around(x * tf_idf + y, decimals=2) for x, y in zip(emb.get_emb(word), doc_vec)]
     return doc_vec

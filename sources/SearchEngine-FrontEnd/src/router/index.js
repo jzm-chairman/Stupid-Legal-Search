@@ -14,7 +14,7 @@ export default new Router({
       path: '/home',
       name: 'Home',
       component: () => import('../components/Home.vue'),
-      meta: { title: '几把搜索' }
+      meta: { title: '菜鸡的搜索' }
     },
     {
       path: '/',

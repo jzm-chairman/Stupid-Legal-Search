@@ -1,5 +1,21 @@
 <template>
     <div>
+      <el-dialog :title="'长文本类案推荐'" :visible.sync="diavisible">
+        <el-input type="textarea" rows="8" v-model="longsearchkey"></el-input>
+        <div style="padding:30px">
+          <span>
+            <el-button type="primary" @click="long_search">搜索</el-button>
+            <el-button @click="diavisible=false;longsearchresult=[]">取消</el-button>
+          </span>
+        </div>
+        <div>
+          <template v-for="(item, i) in longsearchresult">
+            <div v-bind:key="i" style="padding:10px">
+              <a v-bind:href="jump_url(item.index)" target="_blank">{{ item.标题 }}</a>
+            </div>
+          </template>
+        </div>
+      </el-dialog>
       <div class="searchbox">
         <el-autocomplete style="width:60%"
           v-model="filters.searchkey"
@@ -9,6 +25,7 @@
           @select="handle_select">
           <el-button @click="search" slot="append" style="width:100px; font-size:16px">搜索</el-button>
         </el-autocomplete>
+        <el-button type="plain" @click="diavisible=true">长文本类案推荐(测试)</el-button>
       </div>
         <div class="filters">
             <ul>
@@ -51,7 +68,7 @@
                           </a>
                         </div>
                       </div>
-                      <div class="item-summary" v-html="item.摘要"></div>
+                      <div style="padding-top:5px; line-height:150%" class="item-summary" v-html="item.摘要"></div>
                     </div>
                 </template>
             </div>
@@ -88,7 +105,10 @@ export default {
       searchkeycut: '',
       total: 0,
       pageindex: 1,
-      pagesize: 10
+      pagesize: 10,
+      diavisible: false,
+      longsearchkey: '',
+      longsearchresult: []
     }
   },
   created () {
@@ -123,6 +143,9 @@ export default {
     },
     detail_url (index) {
       return 'detail?index=' + String(index) + '&searchkey=' + this.filters.searchkey
+    },
+    jump_url (index) {
+      return 'detail?index=' + String(index)
     },
     add_filter (key, value) {
       this.filters[key] = value
@@ -162,12 +185,22 @@ export default {
     },
     handle_select (item) {
       this.search()
+    },
+    long_search () {
+      console.log(this.longsearchkey)
+      GET('/recommend_docs', {text: this.longsearchkey}).then(response => {
+        this.longsearchresult = response.result
+      })
     }
   }
 }
 </script>
 
 <style scoped>
+.title {
+  font-size: 18px;
+  font-weight: bold;
+}
 .filters {
         position: relative;
         height: 50px;

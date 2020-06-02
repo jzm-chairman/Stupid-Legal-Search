@@ -22,7 +22,7 @@
             <p></p>
             <div v-if="detail.案例类别=='普通案例'">
               <template v-for="(key, i) in recomkeys">
-                <div v-bind:key="i">
+                <div v-bind:key="i" style="padding-bottom:20px">
                   <div class="subtitle2" v-html="key"></div>
                   <template v-for="(name, j) in detail[recomkeys_ext[i]]">
                     <div v-bind:key="j">
@@ -39,13 +39,15 @@
                 </div>
               </template>
             </div>
-            <div style="padding-top:20px">
+            <div>
               <div class="subtitle3">类似案件推荐(测试功能)</div>
-              <template v-for="(item, i) in simrecom">
-                <div v-bind:key="i">
-                  <a v-bind:href="jump_url(item.index)" target="_blank">{{ item.标题 }}</a>
-                </div>
-              </template>
+              <div style="padding-top:20px">
+                <template v-for="(item, i) in simrecom">
+                  <div v-bind:key="i">
+                    <a v-bind:href="jump_url(item.index)" target="_blank">{{ item.标题 }}</a>
+                  </div>
+                </template>
+              </div>
             </div>
         </div>
     </div>

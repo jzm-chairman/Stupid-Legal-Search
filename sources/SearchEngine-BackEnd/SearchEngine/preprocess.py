@@ -254,8 +254,12 @@ def construct_doc_vec(db, doc_files, emb):
     for inverted_index in collection_inverted_index.find():
         inverted_index_dict[inverted_index['term']] = len(inverted_index['appear_list'])
     with tqdm(total=len(doc_files), desc="Calculating Document Vector") as pbar:
-        for paper in collection_paper.find():
+        for paper in collection_paper.find(no_cursor_timeout=True):
             file = paper['path']
+            pid = paper['pid']
+            if collection_doc_vec.find_one({"pid": pid}) is not None:
+                pbar.update(1)
+                continue
             try:
                 root = parse(file).documentElement
                 full_text = root.getElementsByTagName("QW")[0].getAttribute("value")
@@ -272,8 +276,7 @@ def construct_doc_vec(db, doc_files, emb):
             for word, _ in full_text_list:
                 word_times_dict[word] += 1
             doc_vec = calc_doc_vec(word_times_dict, word_doc_dict, total_doc, doc_len, emb)
-            doc_vec_list += [{'pid': paper_num, 'vec': doc_vec}]
-            paper_num += 1
+            doc_vec_list += [{'pid': pid, 'vec': doc_vec}]
             if len(doc_vec_list) > 5000:
                 print('insert_many doc_vec')
                 collection_doc_vec.insert_many(doc_vec_list)
