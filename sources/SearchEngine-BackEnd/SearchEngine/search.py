@@ -316,7 +316,7 @@ def get_recommended_docs(text):
     return get_similar_docs_by_vec(tgt_doc_vec)  # May contain -1
 
 
-def get_similar_docs_by_vec(tgt_doc_vec):
+def get_similar_docs_by_vec(tgt_doc_vec, ignore_pid=-1):
     min_dis = [1e9] * MAX_DOC_RECOMMENDATION
     res_pid = [-1] * MAX_DOC_RECOMMENDATION
 
@@ -326,12 +326,14 @@ def get_similar_docs_by_vec(tgt_doc_vec):
         return np.sqrt(np.dot(v, v))
 
     for doc_dict in collection_doc_vec.find():
+        if doc_dict['pid'] == ignore_pid:
+            continue
         now_dis = calc_dis(doc_dict['vec'], tgt_doc_vec)
         for i, dis in enumerate(min_dis):
             if now_dis < dis:
                 for j in reversed(range(i + 1, MAX_DOC_RECOMMENDATION)):
-                    res_pid[j] = res_pid[j - 1]
                     min_dis[j] = min_dis[j - 1]
+                    res_pid[j] = res_pid[j - 1]
                 min_dis[i] = now_dis
                 res_pid[i] = doc_dict['pid']
                 break
@@ -340,7 +342,7 @@ def get_similar_docs_by_vec(tgt_doc_vec):
 
 def get_similar_docs(pid):
     tgt_doc_vec = collection_doc_vec.find_one({'pid': pid})['vec']
-    return get_similar_docs_by_vec(tgt_doc_vec)
+    return get_similar_docs_by_vec(tgt_doc_vec, pid)
     
 
 def main_loop():
