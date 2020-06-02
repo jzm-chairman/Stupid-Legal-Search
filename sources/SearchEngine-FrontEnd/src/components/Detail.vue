@@ -39,6 +39,14 @@
                 </div>
               </template>
             </div>
+            <div style="padding-top:20px">
+              <div class="subtitle3">类似案件推荐(测试功能)</div>
+              <template v-for="(item, i) in simrecom">
+                <div v-bind:key="i">
+                  <a v-bind:href="jump_url(item.index)" target="_blank">{{ item.标题 }}</a>
+                </div>
+              </template>
+            </div>
         </div>
     </div>
 </template>
@@ -55,7 +63,8 @@ export default {
       showkeys_auth: ['案例原则', '全文'],
       recomkeys: ['同法官案件推荐', '同法律案件推荐'],
       recomkeys_ext: ['法官人员完整', '法律法条分组'],
-      searchcut: ''
+      searchcut: '',
+      simrecom: []
     }
   },
   computed: {
@@ -77,6 +86,10 @@ export default {
           this.detail[akey] = this.render(this.detail[akey])
         }
       }
+    })
+
+    GET('/similar_docs/', {pid: this.$route.query.index}).then(response => {
+      this.simrecom = response.result
     })
   },
   methods: {
@@ -115,6 +128,12 @@ export default {
 }
 .subtitle2 {
   border-left: 10px solid #ff4500;
+  padding-left: 20px;
+  font-size: 24px;
+  font-weight: bold;
+}
+.subtitle3 {
+  border-left: 10px solid #7cfc00;
   padding-left: 20px;
   font-size: 24px;
   font-weight: bold;

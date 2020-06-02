@@ -1,7 +1,7 @@
 <template>
     <div class="header">
         <img src="../assets/logo.jpg" class="logo">
-        几把搜索(JB Search)
+        菜鸡的搜索 <b>C</b>hinese <b>J</b>udgment <b>D</b>ocument Search
     </div>
 </template>
 

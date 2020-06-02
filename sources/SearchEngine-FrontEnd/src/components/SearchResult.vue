@@ -1,5 +1,15 @@
 <template>
     <div>
+      <div class="searchbox">
+        <el-autocomplete style="width:60%"
+          v-model="filters.searchkey"
+          @keyup.enter.native="search"
+          :trigger-on-focus="false"
+          :fetch-suggestions="prompt"
+          @select="handle_select">
+          <el-button @click="search" slot="append" style="width:100px; font-size:16px">搜索</el-button>
+        </el-autocomplete>
+      </div>
         <div class="filters">
             <ul>
                 <li class="filters-item" v-for="(value,key) in filters" :key="key">
@@ -27,16 +37,6 @@
             </el-menu>
         </div>
         <div class="right">
-            <div class="searchbox">
-                <el-autocomplete style="width:100%"
-                  v-model="filters.searchkey"
-                  @keyup.enter.native="search"
-                  :trigger-on-focus="false"
-                  :fetch-suggestions="prompt"
-                  @select="handle_select">
-                    <el-button type="primary" @click="search" slot="append">搜索</el-button>
-                </el-autocomplete>
-            </div>
             <div class="search-result">
                 <template v-for="item in searchresult">
                     <div class="search-item" v-bind:key="item.index">
@@ -151,7 +151,7 @@ export default {
       return summary
     },
     prompt (input, callback) {
-      GET('/recommend', { prefix: input }).then(response => {
+      GET('/recommend_words', { prefix: input }).then(response => {
         this.prompt_list = []
         for (var i in response.result) {
           this.prompt_list.push({value: response.result[i]})
@@ -173,6 +173,7 @@ export default {
         height: 50px;
         overflow: hidden;
         background: #fff;
+        padding-bottom: 5px;
 }
 .filters ul {
         box-sizing: border-box;
@@ -202,16 +203,16 @@ export default {
   width: 300px;
 }
 .right {
-  float: right;
-  padding-right: 100px;
-  width: 60%;
+  float: center;
+  padding-left: 500px;
+  width: 64%;
 }
 .search-item {
   padding: 10px;
   text-align: left;
 }
 .search-result {
-  padding: 20px;
+  padding: 10px;
 }
 .item-prefix {
   background-color: #ff8c00;

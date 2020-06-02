@@ -12,9 +12,9 @@ import time
 from .utils import *
 from threading import Thread
 
-root_dir = "../../../"
+root_dir = "../../dataset/"
 # doc_files_store = root_dir + "temp/filename.pkl"
-inverted_index_store = root_dir + "temp/inverted_index.json"
+# inverted_index_store = root_dir + "temp/inverted_index.json"
 cutter = thulac.thulac(seg_only=True, filt=True)
 client = pymongo.MongoClient(host="localhost", port=27017)
 db = client['SearchEngine']
@@ -67,6 +67,9 @@ def get_inverted_index(term):
 def get_paper_info(pid):
     return collection_paper.find_one({'pid': pid})
 
+def get_paper_info_list(pid_list):
+    return collection_paper.find({"pid": {"$in": pid_list}})
+
 def query_by_condition(condition, doc_list=None):
     cond = {cn_to_key[key] : value for key, value in condition.items()}
     cond_index = {"pid": {"$in": doc_list}} if doc_list is not None else {}
@@ -79,7 +82,6 @@ def filters(doc_recall, condition):
     cursor = query_by_condition(condition, doc_recall)
     # ret = list(set(doc_recall) & {item["pid"] for item in cursor})
     ret = [item["pid"] for item in cursor]
-    print('Filter len: {}'.format(len(ret)))
     return ret
 
 
@@ -109,7 +111,10 @@ def rank(doc_recall, words, rank_key):
     word_appear_list = []
     pt_list = []
     for word in words:
-        word_appear_list += [get_inverted_index(word)['appear_list']]
+        inverted_index = get_inverted_index(word)
+        if not inverted_index:
+            continue
+        word_appear_list += [inverted_index['appear_list']]
         pt_list += [0]
     for pid in doc_recall:
         new_pt_list = []
@@ -301,7 +306,7 @@ def get_recommended_docs(text):
     word_list = []
     for seg_text in seg_list:
         word_list += cutter.cut(seg_text)
-    print('word_list: {}'.format(word_list))
+    # print('word_list: {}'.format(word_list))
     word_set = set([x[0] for x in word_list])
     doc_len = len(word_list)
     word_times_dict = defaultdict(int)
@@ -339,7 +344,11 @@ def get_similar_docs_by_vec(tgt_doc_vec):
 
 
 def get_similar_docs(pid):
-    tgt_doc_vec = collection_doc_vec.find_one({'pid': pid})['vec']
+    vec_item = collection_doc_vec.find_one({'pid': pid})
+    if vec_item is None:
+        full_text = get_single_detail(pid)["全文"]
+        return get_recommended_docs(full_text)
+    tgt_doc_vec = vec_item['vec']
     return get_similar_docs_by_vec(tgt_doc_vec)
     
 

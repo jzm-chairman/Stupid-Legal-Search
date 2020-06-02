@@ -27,6 +27,8 @@ def search(request):
     start = time.time()
     doc_recall = recall(query_words)
     print("Recall Time: {}s".format(time.time() - start))
+    if not doc_recall:
+        return response(json.dumps({"total": 0, "results": []}))
     print(condition, query_words)
     start = time.time()
     doc_filter = filters(doc_recall, condition)
@@ -79,9 +81,11 @@ def recommend_docs(request):
 
 
 def recommend_similar_docs(request):
-    pid = request.GET.get("pid")
+    pid = int(request.GET.get("pid"))
     res_list = get_similar_docs(pid)
-    return response(json.dumps({'result': res_list}, ensure_ascii=False))
+    doc_info = get_meta_info(res_list)["results"]
+    print(res_list)
+    return response(json.dumps({'result': doc_info}, ensure_ascii=False))
 
 
 def test(request):
